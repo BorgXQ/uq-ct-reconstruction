@@ -2,7 +2,7 @@
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 from tomography import normalize_image, project, landweber
-from uq import experiment
+from uq import experiment, spectral_history
 from uq.covariance import geometry
 from numpy.linalg import LinAlgError
 
@@ -33,7 +33,7 @@ def calculate(action):
             return jsonify(experiment(body, run_mc=action == 'uq-mc'))
         image = normalize_image(body.get('image'))
         count = integer(body.get('angles'), 'Projection angles', 1, 180)
-        iterations = integer(body.get('iterations'), 'Iterations', 1, 1000) if action == 'reconstruct' else None
+        iterations = integer(body.get('iterations'), 'Iterations', 1, 2**53-1) if action == 'reconstruct' else None
         matrix, y, angles, offsets, step = project(
             image, count, body.get('noise_std', body.get('sigma', 0.0)), body.get('noise_seed', body.get('seed', 0)))
         step_mode = body.get('step_mode', 'paper')
@@ -46,7 +46,8 @@ def calculate(action):
                            offsets=offsets.tolist(), angles=(angles * 180 / 3.141592653589793).tolist(), step=step)
         uncertainty = experiment(body, select_stopping=True)
         iterations = uncertainty['config']['k']
-        result = landweber(matrix, y, image.ravel(), iterations, step)
+        result = (spectral_history(image.shape[0], count, y, image.ravel(), iterations, step)
+                  if iterations > 1000 else landweber(matrix, y, image.ravel(), iterations, step))
         result['uncertainty'] = uncertainty
         return jsonify(result)
     except MemoryError:

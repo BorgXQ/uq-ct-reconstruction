@@ -2,7 +2,11 @@
 let uqResult=null, uqPayload=null, uqCurrent=false, uqBusy=false, uqTimer=null;
 const uf = value => value===null || value===undefined ? 'unavailable' : Number(value).toPrecision(5);
 const uqIds=['uq-policy','uq-nu','uq-level','uq-c0','iterations','uq-bound','uq-stopping-mode'];
-function uqValid(){return uqIds.every(id=>$(id).reportValidity());}
+function uqValid(){
+  const input=$('iterations');
+  input.setCustomValidity(Number.isSafeInteger(Number(input.value))?'':'Enter an integer no larger than 9,007,199,254,740,991.');
+  return uqIds.every(id=>$(id).reportValidity());
+}
 function uqSettings(){return {k_policy:$('uq-policy').value,mode:'oracle',
   bias_bound:$('uq-bound').value,stopping_mode:$('uq-stopping-mode').value,nu:Number($('uq-nu').value),level:Number($('uq-level').value),
   c0:Number($('uq-c0').value),budget:Number($('iterations').value)};}
@@ -22,7 +26,7 @@ function uqInvalidate() {
   $('uq-status').textContent='Run Landweber above to calculate confidence intervals.';
   uqPlot();uqButtons();
 }
-uqIds.forEach(id=>$(id).addEventListener('input',()=>{uqInvalidate();$('uq-status').textContent='Settings changed. Update intervals & stopping rule, or run Landweber again.';}));
+uqIds.forEach(id=>$(id).addEventListener('input',()=>{$('iterations').setCustomValidity('');uqInvalidate();$('uq-status').textContent='Settings changed. Update intervals & stopping rule, or run Landweber again.';}));
 window.addEventListener('experiment-edit',uqInvalidate);
 window.addEventListener('reconstruction-cleared',uqInvalidate);
 window.addEventListener('calculation-busy',e=>uqButtons(e.detail));

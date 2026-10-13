@@ -231,9 +231,46 @@ class UqApiTests(unittest.TestCase):
         self.assertIsNone(r['stopping'])
         self.assertFalse(r['joint']['available'])
 
+    def test_large_iteration_runs_and_binary_stopping(self):
+        from uq import spectral_history
+        from uq.covariance import geometry
+        from tomography import landweber
+        a,_,_,_,values,vectors,_=geometry(16,45)
+        truth=np.array(self.body['image']).ravel()
+        omega=1/(2*values[-1])
+        y=a@truth+np.random.default_rng(3).normal(0,.02,a.shape[0])
+        direct=landweber(a,y,truth,1200,omega)
+        fast=spectral_history(16,45,y,truth,1200,omega)
+        np.testing.assert_allclose(fast['snapshots'][-1]['image'],direct['snapshots'][-1]['image'],atol=1e-10)
+        for kind in ['spectral','global']:
+            for budget in [2000,1000000]:
+                curve=stopping_curve(values,vectors,omega,.02,.5,10,1,budget,truth,kind)
+                self.assertLessEqual(len(curve['iterations']),102)
+                k=curve['first']
+                if budget==1000000:self.assertIsNotNone(k)
+                def holds(j):
+                    b=spectral_bound(values,omega,j,.5,10) if kind=='spectral' else global_bound(values[-1],j,.5,10)
+                    sd=np.sqrt(np.max(covariance_diagonal(values,vectors,omega,j,.02)[0]))
+                    return b<=sd
+                if k is None:
+                    self.assertFalse(holds(budget))
+                else:
+                    self.assertTrue(holds(k))
+                    if k>1:self.assertFalse(holds(k-1))
+        for mode in ['manual','automatic']:
+            response=self.client.post('/api/reconstruct',json=self.body|{'iterations':1000000,'stopping_mode':mode})
+            self.assertEqual(response.status_code,200)
+            r=response.json;u=r['uncertainty']
+            self.assertLessEqual(len(r['snapshots']),101)
+            self.assertEqual(r['snapshots'][-1]['iteration'],u['config']['k'])
+            if mode=='manual':self.assertEqual(u['config']['k'],1000000)
+            else:self.assertEqual(u['config']['k'],u['stopping']['first'])
+            np.testing.assert_allclose(r['snapshots'][-1]['image'],u['maps']['reconstruction'],atol=1e-10)
+        self.assertTrue(np.isfinite(global_bound(values[-1],2**53-1,.5,10)))
+
     def test_validation(self):
         for changes in [{'uq_resolution':64},{'uq_resolution':17},{'sigma':float('nan')},{'sigma':1e-300},
-                        {'sigma':-1},{'nu':0},{'M':0},{'budget':1001},{'mode':'bad'},{'bias_bound':'bad'},{'stopping_mode':'bad'},
+                        {'sigma':-1},{'nu':0},{'M':0},{'budget':2**53},{'mode':'bad'},{'bias_bound':'bad'},{'stopping_mode':'bad'},
                         {'trials':501},{'mc_seed':-1},{'iterations':True}]:
             response=self.client.post('/api/uq-mc',json=self.body|changes)
             self.assertEqual(response.status_code,400,(changes,response.json))

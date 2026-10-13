@@ -139,6 +139,10 @@ try {
   assert(await evaluate("uqResult.bounds.selected===uqResult.bounds.global_bound && uqResult.config.k===uqResult.stopping.first"),'automatic mode also respects the selected global criterion');
   await evaluate("$('iterations').value=1;$('uq-c0').value=.01;$('reconstruct').click()");await wait('!busy && uqCurrent');
   assert(await evaluate("uqResult.config.k===1 && $('status').textContent.includes('no crossing')"),'automatic mode reports reaching the limit without a crossing');
+  await evaluate("$('iterations').value=1000000;$('uq-stopping-mode').value='manual';$('uq-bound').value='spectral';$('reconstruct').click()");await wait('!busy && uqCurrent');
+  assert(await evaluate("uqResult.config.k===1000000 && results.snapshots.length<=101 && $('iteration-label').textContent==='k = 1000000'"),'million-iteration manual run returns bounded snapshots');
+  await evaluate("$('uq-stopping-mode').value='automatic';$('uq-c0').value=1;$('reconstruct').click()");await wait('!busy && uqCurrent');
+  assert(await evaluate("uqResult.stopping.first!==null && uqResult.config.k===uqResult.stopping.first"),'large automatic search applies the first crossing');
   await evaluate("$('angles').value=1;$('angles').dispatchEvent(new Event('input'))");
   assert(await evaluate("!uqCurrent && $('uq-inspector').textContent.includes('No current interval') && $('uq-mc').disabled"),'geometry edits hide stale uncertainty');
   assert(await evaluate("!$('uq-density-line') && $('uq-pixel-box').hidden"),'geometry changes clear the graph and pixel highlight');

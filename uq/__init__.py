@@ -30,14 +30,14 @@ def settings(body):
     if n not in (16, 24):
         raise ValueError('Exact UQ supports only 16 × 16 or 24 × 24 grids.')
     config = dict(n=n, angles=integer(body.get('angles', 90), 'Angles', 1, 180),
-                  k=integer(body.get('iterations', 100), 'Iterations', 0, 1000),
+                  k=integer(body.get('iterations', 100), 'Iterations', 0, 2**53-1),
                   sigma=number(body.get('noise_std', body.get('sigma', 0)), 'Noise σ', 0, 1),
                   seed=integer(body.get('noise_seed', body.get('seed', 0)), 'Noise seed', 0, 2**32-1),
                   nu=number(body.get('nu', .5), 'Source ν', .01, 4),
                   m=number(body.get('M', 10), 'Source M', 1e-12, 1e12),
                   level=number(body.get('level', .95), 'Confidence level', .9, .99),
                   c0=number(body.get('c0', 1), 'Stopping c₀', .01, 100),
-                  budget=integer(body.get('budget', 300), 'Stopping budget', 1, 1000))
+                  budget=integer(body.get('budget', 300), 'Stopping budget', 1, 2**53-1))
     if 0 < config['sigma'] < 1e-12:
         raise ValueError('For reliable UQ arithmetic, use σ = 0 or σ ≥ 1e-12 line-integral units.')
     for key, allowed, default in [('mode', ('variance','source','oracle'), 'variance'),
@@ -67,8 +67,13 @@ def reconstruction(n, angles, truth_bytes, sigma, seed, k, step_mode):
     truth = np.frombuffer(truth_bytes, dtype=np.float64)
     clean, noise, observed = observation(n, angles, truth_bytes, sigma, seed)
     omega = 1/(2*values[-1]) if step_mode == 'paper' else phase1_step
-    x = apply_t(a, observed, k, omega)
-    clean_x = apply_t(a, clean, k, omega)
+    if k > 1000:
+        gain = finite_filter(values, omega, k)
+        x = vectors @ (gain * (vectors.T @ (a.T @ observed)))
+        clean_x = vectors @ ((values*gain) * (vectors.T @ truth))
+    else:
+        x = apply_t(a, observed, k, omega)
+        clean_x = apply_t(a, clean, k, omega)
     mean = vectors @ ((values*finite_filter(values, omega, k)) * (vectors.T @ truth))
     variance, eta = covariance_diagonal(values, vectors, omega, k, sigma)
     return omega, x, clean_x, mean, variance, eta
@@ -152,3 +157,17 @@ def experiment(body, run_mc=False, select_stopping=False):
                 mc['coverage'][name] = square(mc['coverage'][name])
         result['mc'] = mc
     return result
+
+
+def spectral_history(n, angles, y, truth, iterations, omega):
+    """Evaluate the same untruncated Landweber iterates at 101 saved indices."""
+    a, _, _, _, values, vectors, _ = geometry(n, angles)
+    coefficients = vectors.T @ (a.T @ y)
+    truth_norm = np.linalg.norm(truth)
+    history, snapshots = [], []
+    for k in sorted({i*iterations//100 for i in range(101)}):
+        x = vectors @ (finite_filter(values, omega, k)*coefficients)
+        history.append(dict(iteration=k, residual=float(np.linalg.norm(y-a@x)),
+                            error=float(np.linalg.norm(x-truth)/truth_norm) if truth_norm else None))
+        snapshots.append(dict(iteration=k, image=x.reshape(n,n).tolist()))
+    return dict(history=history, snapshots=snapshots, step=omega)

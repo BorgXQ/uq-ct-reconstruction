@@ -24,7 +24,7 @@ $('shade').oninput = () => {
 $('width').oninput = () => $('width-value').textContent = `${$('width').value} px`;
 ['angles', 'resolution', 'noise', 'noise-seed'].forEach(id => $(id).addEventListener('input', invalidate));
 $('iterations').oninput = () => {
-  if (results && projection?.version === version) $('status').textContent = `Showing saved run through k = ${results.history.length - 1}. Run Landweber to use the new iteration count.`;
+  if (results && projection?.version === version) $('status').textContent = `Showing saved run through k = ${results.history.at(-1).iteration}. Run Landweber to use the new iteration count.`;
 };
 function position(e) {
   const r = drawing.getBoundingClientRect();

@@ -126,7 +126,7 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(self.client.post('/api/project',json=self.body|{'image':np.zeros((n,n)).tolist()}).status_code,400)
 
     def test_bad_inputs(self):
-        for change in [{'noise_std':-1}, {'noise_std':1.1}, {'noise_std':True}, {'noise_std':'0.1'}, {'noise_std':float('nan')}, {'noise_seed':-1}, {'noise_seed':1.5}, {'noise_seed':True}, {'image':np.zeros((32,32)).tolist()}, {'angles':0}, {'angles':181}, {'angles':2.5}, {'angles':True}, {'iterations':1001}, {'image':[]}]:
+        for change in [{'noise_std':-1}, {'noise_std':1.1}, {'noise_std':True}, {'noise_std':'0.1'}, {'noise_std':float('nan')}, {'noise_seed':-1}, {'noise_seed':1.5}, {'noise_seed':True}, {'image':np.zeros((32,32)).tolist()}, {'angles':0}, {'angles':181}, {'angles':2.5}, {'angles':True}, {'iterations':2**53}, {'image':[]}]:
             self.assertEqual(self.client.post('/api/reconstruct', json=self.body | change).status_code, 400)
         self.assertEqual(self.client.post('/api/project', json=[]).status_code, 400)
         self.assertEqual(self.client.post('/api/project', data='{', content_type='application/json').status_code, 400)

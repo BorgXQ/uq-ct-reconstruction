@@ -13,19 +13,13 @@
     </div>
     <div class="controls source-controls">
       <div><h3>Source condition</h3>
-        <label>Bias assumption <select id="uq-mode"><option value="source" selected>Specify M</option><option value="oracle">Calibrate M from drawing</option><option value="variance">No bias assumption</option></select></label>
-        <label>Exponent ν <input id="uq-nu" type="number" value="0.5" min="0.01" max="4" step="any" required></label>
-        <label id="uq-M-field">Proposed M <input id="uq-M" type="number" value="10" min="0.000000000001" max="1000000000000" step="any" required></label>
-        <p class="hint">Assumes x = (AᵀA)<sup>ν</sup>w with ‖w‖ ≤ M. The proposed values are checked using your drawing. Calibration derives M using that known truth; it is not available for an unknown image.</p>
-        <label>K selection <select id="uq-policy"><option value="fixed">Independent of observed noise</option><option value="exploratory">Chosen after inspecting results</option></select></label>
+        <p class="hint">Assumes x = (AᵀA)<sup>ν</sup>w with ‖w‖ ≤ M. M is always calibrated from your drawing. Compatibility is checked numerically; this calibration requires known ground truth.</p>
         <button id="uq-run" disabled>Update intervals & stopping rule</button>
         <p id="uq-source" class="hint">Source condition has not been checked.</p>
       </div>
       <div><h3>Early stopping</h3>
         <p><strong>B<sub>K</sub> ≤ c₀ v<sub>K</sub></strong></p>
-        <p class="hint">Stop at the first iteration where the bias bound is no larger than c₀ times the largest pixel SD. This is a balancing rule, not a guarantee of minimum reconstruction error.</p>
-        <label>Balance c₀ <input id="uq-c0" type="number" value="1" min="0.01" max="100" step="any" required></label>
-        <label>Search through K <input id="uq-budget" type="number" value="300" min="1" max="1000" required></label>
+        <p class="hint">Stop at the first iteration where the bias bound is no larger than c₀ times the largest pixel SD. The search runs from 1 through the iteration count in 03 / Reconstruction. This is a balancing rule, not a guarantee of minimum reconstruction error.</p>
         <p id="uq-stop-status">Awaiting reconstruction.</p>
         <p id="uq-stop-values" class="hint"></p>
         <button id="uq-use-stop" disabled>Use first stopping iteration</button>

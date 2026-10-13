@@ -85,8 +85,8 @@ try {
   const oldNoise=await evaluate('JSON.stringify(uqResult.measurements.noise)');
   await evaluate("$('iterations').value=12;$('reconstruct').click()");await wait('!busy && uqCurrent');
   assert(await evaluate('JSON.stringify(uqResult.measurements.noise)')===oldNoise,'changing K preserves noise');
-  await evaluate("$('uq-mode').value='oracle';$('uq-mode').dispatchEvent(new Event('input'));$('uq-c0').value=100;$('uq-run').click()");await wait('!uqBusy && uqCurrent');
-  assert(await evaluate("uqResult.source.status==='verified' && uqResult.maps.lower!==null && $('uq-inspector').textContent.includes('95% interval')"),'advanced source mode enables raw conditional intervals');
+  await evaluate("$('uq-c0').value=100;$('iterations').value=300;$('iterations').dispatchEvent(new Event('input'));$('reconstruct').click()");await wait('!busy && uqCurrent');
+  assert(await evaluate("uqResult.source.status==='verified' && uqResult.maps.lower!==null && $('uq-inspector').textContent.includes('95% interval')"),'automatic drawing calibration enables raw conditional intervals');
   const stopping=await evaluate('JSON.stringify(uqResult.stopping)');
   await evaluate("$('resample').click()");await wait('!busy && !results');
   await evaluate("$('reconstruct').click()");await wait('!busy && uqCurrent');
@@ -100,9 +100,13 @@ try {
   assert(await evaluate("uqResult.mc.trials===40 && uqResult.mc.coverage!==null"),'Monte Carlo validates the displayed reconstruction');
   await evaluate("$('uq-policy').value='exploratory';$('uq-policy').dispatchEvent(new Event('input'));$('uq-run').click()");await wait('!uqBusy && uqCurrent');
   assert(await evaluate('uqResult.maps.lower===null && uqResult.stopping===null'),'post-selection K disables fixed-K confidence');
-  await evaluate("$('uq-policy').value='fixed';$('uq-mode').value='source';$('uq-M').value=0.000001;$('uq-run').click()");await wait('!uqBusy && uqCurrent');
-  assert(await evaluate("uqResult.source.status==='failed' && $('uq-inspector').textContent.includes('unavailable')"),'invalid source bound never produces an interval');
-  await evaluate("$('uq-mode').value='oracle';$('uq-run').click()");await wait('!uqBusy && uqCurrent');
+  await evaluate("$('uq-policy').value='fixed';$('uq-run').click()");await wait('!uqBusy && uqCurrent');
+  assert(await evaluate("uqResult.config.mode==='oracle' && uqResult.config.budget===Number($('iterations').value)"),'drawing calibration and stopping budget follow reconstruction settings');
+  assert(await evaluate("['uq-nu','uq-policy','uq-c0'].every(id=>$('reconstruction-controls').contains($(id))) && !document.querySelector('#uq-mode,#uq-M,#uq-budget')"),'reconstruction owns the source and stopping controls');
+  await evaluate("$('iterations').value=20;$('iterations').dispatchEvent(new Event('input'))");
+  assert(await evaluate("!uqCurrent && $('uq-mc').disabled"),'iteration edits invalidate the old stopping search');
+  await evaluate("$('uq-run').click()");await wait('!uqBusy && uqCurrent');
+  assert(await evaluate('uqResult.config.budget===20'),'updated stopping search uses the iteration count');
   const width95=await evaluate('uqResult.maps.stochastic[0][0]');
   await evaluate("$('uq-level').value=.99;$('uq-level').dispatchEvent(new Event('input'))");
   assert(await evaluate("$('uq-inspector').textContent.includes('No current interval') && $('uq-mc').disabled"),'confidence changes invalidate interval and validation results');

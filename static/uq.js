@@ -1,11 +1,11 @@
 'use strict';
 let uqResult=null, uqPayload=null, uqCurrent=false, uqBusy=false, uqTimer=null;
 const uf = value => value===null || value===undefined ? 'unavailable' : Number(value).toPrecision(5);
-const uqIds=['uq-policy','uq-mode','uq-nu','uq-M','uq-level','uq-c0','uq-budget'];
-function uqValid(){return uqIds.every(id=>id==='uq-M' && $('uq-mode').value!=='source' || $(id).reportValidity());}
-function uqSettings(){return {k_policy:$('uq-policy').value,mode:$('uq-mode').value,
-  nu:Number($('uq-nu').value),M:$('uq-mode').value==='source'?Number($('uq-M').value):10,level:Number($('uq-level').value),
-  c0:Number($('uq-c0').value),budget:Number($('uq-budget').value)};}
+const uqIds=['uq-policy','uq-nu','uq-level','uq-c0','iterations'];
+function uqValid(){return uqIds.every(id=>$(id).reportValidity());}
+function uqSettings(){return {k_policy:$('uq-policy').value,mode:'oracle',
+  nu:Number($('uq-nu').value),level:Number($('uq-level').value),
+  c0:Number($('uq-c0').value),budget:Number($('iterations').value)};}
 function uqButtons(locked=busy) {
   const available=projection?.version===version && !!results;
   $('uq-run').disabled=locked||!available;
@@ -22,7 +22,6 @@ function uqInvalidate() {
   uqButtons();
 }
 uqIds.forEach(id=>$(id).addEventListener('input',()=>{uqInvalidate();$('uq-status').textContent='Settings changed. Update intervals & stopping rule, or run Landweber again.';}));
-$('uq-mode').addEventListener('input',()=>{$('uq-M-field').hidden=$('uq-mode').value!=='source';});
 window.addEventListener('experiment-edit',uqInvalidate);
 window.addEventListener('reconstruction-cleared',uqInvalidate);
 window.addEventListener('calculation-busy',e=>uqButtons(e.detail));

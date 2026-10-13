@@ -24,9 +24,10 @@ def spectrum(a):
 def geometry(n, angles):
     if n not in (16, 24):
         raise ValueError('Exact UQ supports only 16 × 16 or 24 × 24 grids.')
-    a, theta, offsets, phase1_step = build_operator(n, angles)
+    operator, theta, offsets, step = build_operator(n, angles)
+    a = operator.sparse
     values, vectors, tolerance = spectrum(a)
-    return a, theta, offsets, phase1_step, values, vectors, tolerance
+    return a, theta, offsets, step, values, vectors, tolerance
 
 
 def finite_filter(values, omega, k):

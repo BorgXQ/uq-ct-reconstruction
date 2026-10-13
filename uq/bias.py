@@ -31,7 +31,12 @@ def spectral_bound(values, omega, k, nu, m):
 
 
 def global_bound(largest, k, nu, m):
-    """Eq. 3.18, ONLY for ω=1/(2 λmax); use log space for large K."""
+    """Eq. 3.18 with largest=1/(2ω); use log space for large K.
+
+    The algebraic envelope maximizes (1-ωλ)^K λ^ν over 0 <= ωλ <= 1.
+    Passing the effective power estimate keeps it consistent with the actual
+    iteration step, rather than substituting a different exact eigenvalue.
+    """
     k = np.asarray(k, dtype=float)
     return np.exp(nu*np.log(2*largest) + np.log(m) + nu*np.log(nu)
                   - nu*np.log(k) - (nu+k)*np.log1p(nu/k))
@@ -42,7 +47,7 @@ def stopping_curve(values, vectors, omega, sigma, nu, m, c0, budget, truth, boun
         eta = covariance_eigenvalues(values, omega, k, sigma)
         sd = float(np.sqrt(np.max((vectors*vectors) @ eta)))
         bound = (spectral_bound(values, omega, k, nu, m) if bound_kind == "spectral"
-                 else float(global_bound(values[-1], k, nu, m)))
+                 else float(global_bound(1/(2*omega), k, nu, m)))
         return bound, sd
 
     # With the paper step all residual factors lie in [0,1]: bias decreases
@@ -68,7 +73,7 @@ def stopping_curve(values, vectors, omega, sigma, nu, m, c0, budget, truth, boun
     etas = np.column_stack([covariance_eigenvalues(values, omega, int(k), sigma) for k in ks])
     max_sd = np.sqrt(np.max((vectors*vectors) @ etas, axis=0))
     bounds = (np.array([spectral_bound(values, omega, int(k), nu, m) for k in ks])
-              if bound_kind == "spectral" else global_bound(values[-1], ks, nu, m))
+              if bound_kind == "spectral" else global_bound(1/(2*omega), ks, nu, m))
     coeff = vectors.T @ truth
     actual_bias = np.linalg.norm((1-omega*values[:, None])**ks * coeff[:, None], axis=0)
     if budget <= 1000 or np.any(omega*values > 1):

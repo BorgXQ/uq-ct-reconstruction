@@ -2,7 +2,7 @@
 from functools import lru_cache
 import numpy as np
 from scipy.stats import norm
-from tomography import normalize_image
+from tomography import normalize_image, build_operator, project
 from .operators import apply_t
 from .covariance import geometry, covariance_diagonal, finite_filter
 from .bias import source_check, spectral_bound, global_bound, stopping_curve
@@ -48,7 +48,7 @@ def settings(body):
                   probe_delta=number(body.get('probe_delta', .01), 'Probe failure probability δ', .000001, .5),
                   tail_eta=number(body.get('tail_eta', .1), 'Omitted bias ratio η', 0, 1))
     if 0 < config['sigma'] < 1e-12:
-        raise ValueError('For reliable UQ arithmetic, use σ = 0 or σ ≥ 1e-12 line-integral units.')
+        raise ValueError('For reliable UQ arithmetic, use σ = 0 or σ ≥ 1e-12 projection units.')
     for key, allowed, default in [('mode', ('variance','source','oracle'), 'variance'),
                                   ('uq_method', ('practical','classical'), 'practical'),
                                   ('bias_bound', ('spectral','global'), 'spectral'),
@@ -59,31 +59,33 @@ def settings(body):
         if value not in allowed:
             raise ValueError(f'Invalid {key}.')
         config[key] = value
+    # Legacy clients use the notebook step too; there is now one operator/step.
+    config['step_mode'] = 'paper'
     return image.ravel(), config
 
 
 @lru_cache(maxsize=8)
 def observation(n, angles, truth_bytes, sigma, seed):
-    a = geometry(n, angles)[0]
-    truth = np.frombuffer(truth_bytes, dtype=np.float64)
-    clean = a @ truth
-    noise = np.random.default_rng(seed).normal(0, sigma, clean.shape)
-    return clean, noise, clean + noise
+    truth = np.frombuffer(truth_bytes, dtype=np.float64).reshape(n, n)
+    operator, observed, _, _, _ = project(truth, angles, sigma, seed)
+    clean = operator @ truth.ravel()
+    noise = sigma*np.random.default_rng(seed).standard_normal(clean.shape)
+    return clean, noise, observed
 
 
 @lru_cache(maxsize=8)
 def reconstruction(n, angles, truth_bytes, sigma, seed, k, step_mode):
-    a, _, _, phase1_step, values, vectors, _ = geometry(n, angles)
+    a, _, _, omega, values, vectors, _ = geometry(n, angles)
     truth = np.frombuffer(truth_bytes, dtype=np.float64)
     clean, noise, observed = observation(n, angles, truth_bytes, sigma, seed)
-    omega = 1/(2*values[-1]) if step_mode == 'paper' else phase1_step
     if k > 1000:
         gain = finite_filter(values, omega, k)
         x = vectors @ (gain * (vectors.T @ (a.T @ observed)))
         clean_x = vectors @ ((values*gain) * (vectors.T @ truth))
     else:
-        x = apply_t(a, observed, k, omega)
-        clean_x = apply_t(a, clean, k, omega)
+        operator = build_operator(n, angles)[0]
+        x = apply_t(operator, observed, k, omega)
+        clean_x = apply_t(operator, clean, k, omega)
     mean = vectors @ ((values*finite_filter(values, omega, k)) * (vectors.T @ truth))
     variance, eta = covariance_diagonal(values, vectors, omega, k, sigma)
     return omega, x, clean_x, mean, variance, eta
@@ -91,8 +93,8 @@ def reconstruction(n, angles, truth_bytes, sigma, seed, k, step_mode):
 
 @lru_cache(maxsize=8)
 def stopping(n, angles, truth_bytes, sigma, nu, m, c0, budget, bound_kind):
-    _, _, _, _, values, vectors, _ = geometry(n, angles)
-    return stopping_curve(values, vectors, 1/(2*values[-1]), sigma, nu, m, c0,
+    _, _, _, omega, values, vectors, _ = geometry(n, angles)
+    return stopping_curve(values, vectors, omega, sigma, nu, m, c0,
                           budget, np.frombuffer(truth_bytes, dtype=np.float64), bound_kind)
 
 
@@ -134,7 +136,7 @@ def experiment(body, run_mc=False, select_stopping=False):
     bias = mean-truth
     candidate = c['mode'] != 'variance' and np.isfinite(source['M'])
     spec = spectral_bound(values, omega, k, c['nu'], source['M']) if candidate else None
-    global_b = float(global_bound(values[-1], k, c['nu'], source['M'])) if k > 0 and candidate and c['step_mode']=='paper' else None
+    global_b = float(global_bound(1/(2*omega), k, c['nu'], source['M'])) if k > 0 and candidate and c['step_mode']=='paper' else None
     bound = spec if c['bias_bound'] == 'spectral' else global_b
     interval_sd = sd
     practical_audit = approximate_variance = residual_estimate = corrected_variance = None
@@ -153,7 +155,7 @@ def experiment(body, run_mc=False, select_stopping=False):
     def square(v):
         return None if v is None else np.asarray(v).reshape(n,n).tolist()
     def sinogram(v):
-        return v.reshape(angles, len(offsets)).T.tolist()
+        return v.reshape(len(offsets), angles).tolist()
     result = dict(config=c, method=('Paper §3.6 randomized UQ with exact small-grid audits' if practical else 'Exact small-system covariance (full eigendecomposition, floating point)'), practical=practical_audit,
                   omega=float(omega), rank=rank, pixels=n*n, rank_tolerance=tolerance,
                   normal_condition=float(values[-1]/values[0]) if rank==n*n else None,

@@ -69,7 +69,8 @@ try {
   await evaluate("$('clear').click();$('noise').value=0;$('project').click()");await wait('!busy && projection.version===version');
   await evaluate("$('iterations').value=5;$('reconstruct').click()");await wait('!busy && results!==null && uqCurrent');
   assert(await evaluate("results.history.at(-1).residual===0 && uqResult.maps.sd.flat().every(v=>v===0)"),'black image and zero noise are safe');
-  await evaluate("$('noise').value=.05;$('noise').dispatchEvent(new Event('input'))");
+  // Pixel-length projections at n=24 have about 12× the former physical scale.
+  await evaluate("$('noise').value=.6;$('noise').dispatchEvent(new Event('input'))");
   assert(await evaluate("$('reconstruct').disabled && !uqCurrent && $('uq-inspector').textContent.includes('No current interval')"),'noise changes invalidate both reconstruction and uncertainty');
   await evaluate("document.querySelector('[data-tool=circle]').click();$('shade').value=200");
   await gesture(240,240,310,240);

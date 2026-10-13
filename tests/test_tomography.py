@@ -12,24 +12,28 @@ class NumericalTests(unittest.TestCase):
             x, z = rng.normal(size=a.shape[1]), rng.normal(size=a.shape[0])
             self.assertAlmostEqual(float((a @ x) @ z), float(x @ (a.T @ z)), places=10)
 
-    def test_axis_aligned_line_lengths_and_orientation(self):
-        n = 64
-        a, _, offsets, _ = build_operator(n, 2)
-        image = np.ones((n, n))
-        sino = (a @ image.ravel()).reshape(2, -1)
-        expected = np.where(np.abs(offsets) <= 1, 2., 0.)
-        np.testing.assert_allclose(sino, np.tile(expected, (2, 1)), atol=1e-12)
-        image[:] = 0
-        image[4:9, 41:46] = .6
-        sino = (a @ image.ravel()).reshape(2, -1)
-        self.assertGreater(offsets @ sino[0], 0)  # right of center
-        self.assertLess(offsets @ sino[1], 0)  # above center
+    def test_library_geometry_scale_and_orientation(self):
+        from skimage.transform import radon
+        for n, count in [(16, 180), (24, 7), (128, 17)]:
+            a, angles, offsets, _ = build_operator(n, count)
+            image = np.ones((n, n))
+            image[2:7, n-9:n-3] = .2
+            expected = radon(image, theta=np.rad2deg(angles), circle=False, preserve_range=True)
+            actual = (a @ image.ravel()).reshape(len(offsets), count)
+            np.testing.assert_allclose(actual, expected, atol=1e-12)
+            self.assertEqual(len(offsets), int(np.ceil(np.sqrt(2)*n)))
+            self.assertEqual(offsets[len(offsets)//2], 0)
+            # At zero degrees the detector values are column sums, in pixel units.
+            np.testing.assert_allclose(actual[len(offsets)//2-n//2:len(offsets)//2+n//2, 0],
+                                       image.sum(axis=0), atol=1e-12)
 
-    def test_diagonal_ray_length(self):
-        a, _, offsets, _ = build_operator(64, 4)
-        sino = (a @ np.ones(64**2)).reshape(4, -1)
-        expected = np.maximum(0, 2 * (np.sqrt(2) - np.abs(offsets)))
-        np.testing.assert_allclose(sino[1], expected, atol=1e-12)
+    def test_small_uq_matrix_matches_library_and_transpose(self):
+        rng = np.random.default_rng(31)
+        for n in (16, 24):
+            a, _, _, _ = build_operator(n, 17)
+            x, y = rng.normal(size=a.shape[1]), rng.normal(size=a.shape[0])
+            np.testing.assert_allclose(a.sparse @ x, a @ x, atol=1e-12)
+            np.testing.assert_allclose(a.sparse.T @ y, a.T @ y, atol=1e-12)
 
     def test_density_preserved(self):
         image = normalize_image(np.full((16, 16), 127 / 255))
@@ -52,8 +56,8 @@ class NumericalTests(unittest.TestCase):
         self.assertEqual(result['snapshots'][0]['iteration'], 0)
         self.assertEqual(result['snapshots'][-1]['iteration'], 200)
         # Bound is independently checked against a dense small-geometry spectrum.
-        small, _, _, omega = build_operator(64, 2)
-        largest_squared = np.linalg.norm(small.toarray(), 2)**2
+        small, _, _, omega = build_operator(16, 2)
+        largest_squared = np.linalg.norm(small.sparse.toarray(), 2)**2
         self.assertLess(omega, 2/largest_squared)
 
     def test_gaussian_noise(self):

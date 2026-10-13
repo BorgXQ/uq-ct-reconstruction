@@ -44,8 +44,7 @@ def approximation(n, angles, retained_rank, oversampling, sketch_seed, probes, p
 class Practical:
     def __init__(self, config, truth, source):
         self.c, self.truth, self.source = config, truth, source
-        _, _, _, _, self.values, self.vectors, _ = geometry(config['n'], config['angles'])
-        self.omega = 1/(2*self.values[-1])
+        _, _, _, self.omega, self.values, self.vectors, _ = geometry(config['n'], config['angles'])
         (self.lam, self.u, exact_coeff, approx_coeff, self.approx_error, self.beta) = approximation(
             config['n'], config['angles'], config['retained_rank'], config['oversampling'],
             config['sketch_seed'], config['probes'], config['probe_seed'])

@@ -146,7 +146,7 @@ class UqApiTests(unittest.TestCase):
 
     def test_ineligible_and_edge_cases(self):
         for changes in [{'mode':'variance'},{'mode':'source','M':1e-12},{'sigma':0},
-                        {'step_mode':'phase1'},{'k_policy':'exploratory'}]:
+                        {'k_policy':'exploratory'}]:
             r=self.client.post('/api/uq',json=self.body|changes).json
             if changes.get('mode')=='variance' or changes.get('sigma')==0:
                 self.assertIsNone(r['maps']['lower'])
@@ -157,9 +157,6 @@ class UqApiTests(unittest.TestCase):
             self.assertIsNone(r['stopping'])
             self.assertFalse(r['joint']['available'])
             self.assertTrue(r['interval_reason'])
-            if changes.get('step_mode')=='phase1':
-                self.assertIsNone(r['bounds']['global_bound'])
-                self.assertIsNotNone(r['bounds']['spectral'])
         truth=np.zeros((16,16));truth[2:4,10:12]=.8
         r=self.client.post('/api/uq',json=self.body|{'image':truth.tolist(),'angles':1}).json
         self.assertEqual(r['source']['status'],'failed')
@@ -192,10 +189,10 @@ class UqApiTests(unittest.TestCase):
         np.testing.assert_allclose(r['stopping']['bound'],expected)
         g=experiment(self.body|{'bias_bound':'global'})
         self.assertEqual(g['bounds']['selected'],g['bounds']['global_bound'])
-        np.testing.assert_allclose(g['stopping']['bound'],global_bound(values[-1],np.arange(1,31),.5,g['source']['M']))
+        np.testing.assert_allclose(g['stopping']['bound'],global_bound(1/(2*g['omega']),np.arange(1,31),.5,g['source']['M']))
 
     def test_automatic_and_manual_stopping(self):
-        body=self.body|{'iterations':100,'c0':100,'stopping_mode':'automatic'}
+        body=self.body|{'iterations':200,'c0':100,'stopping_mode':'automatic'}
         for kind in ['spectral','global']:
             auto=self.client.post('/api/reconstruct',json=body|{'bias_bound':kind}).json
             r=auto['uncertainty']; first=r['stopping']['first']
@@ -208,7 +205,7 @@ class UqApiTests(unittest.TestCase):
             repeat=self.client.post('/api/reconstruct',json=body|{'bias_bound':kind,'seed':99}).json
             self.assertEqual(repeat['uncertainty']['config']['k'],first)
         manual=self.client.post('/api/reconstruct',json=body|{'stopping_mode':'manual'}).json
-        self.assertEqual(manual['snapshots'][-1]['iteration'],100)
+        self.assertEqual(manual['snapshots'][-1]['iteration'],200)
         capped=self.client.post('/api/reconstruct',json=body|{'iterations':1,'c0':.01}).json['uncertainty']
         self.assertIsNone(capped['stopping']['first'])
         self.assertEqual(capped['config']['k'],1)
@@ -216,7 +213,7 @@ class UqApiTests(unittest.TestCase):
         failed=self.client.post('/api/reconstruct',json=body|{'mode':'source','M':1e-12}).json['uncertainty']
         self.assertEqual(failed['interval_status'],'exploratory')
         self.assertIn('unavailable',failed['selection']['message'])
-        self.assertEqual(failed['config']['k'],100)
+        self.assertEqual(failed['config']['k'],200)
 
     def test_unverified_source_never_claims_coverage(self):
         from unittest.mock import patch
@@ -234,22 +231,21 @@ class UqApiTests(unittest.TestCase):
     def test_large_iteration_runs_and_binary_stopping(self):
         from uq import spectral_history
         from uq.covariance import geometry
-        from tomography import landweber
-        a,_,_,_,values,vectors,_=geometry(16,45)
+        from tomography import landweber, build_operator
+        a,_,_,omega,values,vectors,_=geometry(16,45)
         truth=np.array(self.body['image']).ravel()
-        omega=1/(2*values[-1])
         y=a@truth+np.random.default_rng(3).normal(0,.02,a.shape[0])
-        direct=landweber(a,y,truth,1200,omega)
+        direct=landweber(build_operator(16,45)[0],y,truth,1200,omega)
         fast=spectral_history(16,45,y,truth,1200,omega)
         np.testing.assert_allclose(fast['snapshots'][-1]['image'],direct['snapshots'][-1]['image'],atol=1e-10)
         for kind in ['spectral','global']:
-            for budget in [2000,1000000]:
+            for budget in [2000,10000000]:
                 curve=stopping_curve(values,vectors,omega,.02,.5,10,1,budget,truth,kind)
                 self.assertLessEqual(len(curve['iterations']),102)
                 k=curve['first']
-                if budget==1000000:self.assertIsNotNone(k)
+                if budget==10000000:self.assertIsNotNone(k)
                 def holds(j):
-                    b=spectral_bound(values,omega,j,.5,10) if kind=='spectral' else global_bound(values[-1],j,.5,10)
+                    b=spectral_bound(values,omega,j,.5,10) if kind=='spectral' else global_bound(1/(2*omega),j,.5,10)
                     sd=np.sqrt(np.max(covariance_diagonal(values,vectors,omega,j,.02)[0]))
                     return b<=sd
                 if k is None:

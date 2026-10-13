@@ -1,8 +1,7 @@
-"""Parallel-beam CT on piecewise-constant pixels in [-1, 1]²."""
+"""Notebook-compatible Radon measurements and zero-initialized Landweber."""
 from functools import lru_cache
-from array import array
 import numpy as np
-from scipy.sparse import csr_matrix
+from radon_operator import RadonOperator, notebook_step
 
 
 def normalize_image(values):
@@ -15,56 +14,14 @@ def normalize_image(values):
     return image
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=4)
 def build_operator(n, angle_count):
-    """Split each ray at grid crossings; segment lengths are CSR coefficients.
-
-    Coordinates: x increases right, y increases down (array row convention).
-    A ray is s*(cos(theta),sin(theta)) + t*(-sin(theta),cos(theta)).
-    Rows are angle-major; columns are row-major image pixels.
-    """
+    """Notebook Radon geometry, matched transpose, and power-iteration step."""
     if n not in (16, 24, 64, 128, 256) or not 1 <= angle_count <= 180:
         raise ValueError("Unsupported geometry.")
-    angles = np.arange(angle_count) * np.pi / angle_count
-    spacing = 2.0 / n
-    detector_count = int(np.ceil(np.sqrt(2) * n)) + 1
-    offsets = (np.arange(detector_count) - (detector_count - 1) / 2) * spacing
-    edges = np.linspace(-1, 1, n + 1)
-    # Packed buffers avoid millions of boxed Python numbers on larger grids.
-    indices, data, indptr = array('i'), array('d'), [0]
-    for theta in angles:
-        normal = np.array([np.cos(theta), np.sin(theta)])
-        normal[np.abs(normal) < 1e-12] = 0
-        direction = np.array([-normal[1], normal[0]])
-        for offset in offsets:
-            origin = offset * normal
-            lower, upper = -np.inf, np.inf
-            crossings = []
-            for axis in range(2):
-                if abs(direction[axis]) < 1e-12:
-                    if not -1 <= origin[axis] <= 1:
-                        upper = -np.inf
-                        break
-                else:
-                    ts = (edges - origin[axis]) / direction[axis]
-                    lower = max(lower, min(ts[0], ts[-1]))
-                    upper = min(upper, max(ts[0], ts[-1]))
-                    crossings.extend(ts)
-            if upper > lower:
-                ts = np.unique(np.clip(crossings, lower, upper))
-                lengths = np.diff(ts)
-                keep = lengths > 1e-12
-                midpoints = origin[:, None] + direction[:, None] * ((ts[:-1] + ts[1:]) / 2)
-                pixels = np.clip(np.floor((midpoints + 1) / spacing).astype(int), 0, n - 1)
-                indices.frombytes((pixels[1] * n + pixels[0])[keep].astype(np.int32).tobytes())
-                data.frombytes(lengths[keep].tobytes())
-            indptr.append(len(data))
-    matrix = csr_matrix((np.frombuffer(data, dtype=np.float64),
-                         np.frombuffer(indices, dtype=np.int32), indptr),
-                        shape=(angle_count * detector_count, n * n))
-    # ||A||₂² <= ||A||₁ ||A||∞. A rigorous bound avoids unsafe spectral estimates.
-    bound = float(np.max(matrix.sum(axis=0)) * np.max(matrix.sum(axis=1)))
-    return matrix, angles, offsets, 1.0 / bound
+    operator = RadonOperator(n, angle_count)
+    offsets = np.arange(operator.detectors) - operator.detectors//2
+    return operator, operator.radians, offsets, notebook_step(operator)
 
 
 def project(image, angle_count, noise_std=0.0, noise_seed=0):
@@ -82,7 +39,7 @@ def project(image, angle_count, noise_std=0.0, noise_seed=0):
 
 def landweber(matrix, measurements, truth, iterations, step):
     """Unconstrained descent; bound snapshot storage to 1,048,576 values."""
-    transpose = matrix.T.tocsr()
+    transpose = matrix.T
     x = np.zeros(matrix.shape[1])
     norm_truth = np.linalg.norm(truth)
     saved = set(np.linspace(0, iterations, min(iterations + 1, 101, 1048576 // x.size), dtype=int))

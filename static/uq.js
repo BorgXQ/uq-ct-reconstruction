@@ -1,13 +1,15 @@
 'use strict';
 let uqResult=null, uqPayload=null, uqCurrent=false, uqBusy=false, uqTimer=null;
 const uf = value => value===null || value===undefined ? 'unavailable' : Number(value).toPrecision(5);
-const uqIds=['uq-policy','uq-nu','uq-level','uq-c0','iterations','uq-bound','uq-stopping-mode'];
+const practicalIds=['uq-rank','uq-oversampling','uq-probes','uq-epsilon','uq-delta','uq-tail','uq-sketch-seed','uq-probe-seed'];
+const uqIds=['uq-policy','uq-nu','uq-level','uq-c0','iterations','uq-bound','uq-stopping-mode','uq-method',...practicalIds];
 function uqValid(){
   const input=$('iterations');
   input.setCustomValidity(Number.isSafeInteger(Number(input.value))?'':'Enter an integer no larger than 9,007,199,254,740,991.');
-  return uqIds.every(id=>$(id).reportValidity());
+  return uqIds.filter(id=>$('uq-method').value==='practical'?id!=='uq-bound':!practicalIds.includes(id)).every(id=>$(id).reportValidity());
 }
-function uqSettings(){return {k_policy:$('uq-policy').value,mode:'oracle',
+function uqSettings(){return {uq_method:$('uq-method').value,
+  ...($('uq-method').value==='practical'?{retained_rank:Number($('uq-rank').value),oversampling:Number($('uq-oversampling').value),probes:Number($('uq-probes').value),probe_epsilon:Number($('uq-epsilon').value),probe_delta:Number($('uq-delta').value),tail_eta:Number($('uq-tail').value),sketch_seed:Number($('uq-sketch-seed').value),probe_seed:Number($('uq-probe-seed').value)}:{}),k_policy:$('uq-policy').value,mode:'oracle',
   bias_bound:$('uq-bound').value,stopping_mode:$('uq-stopping-mode').value,nu:Number($('uq-nu').value),level:Number($('uq-level').value),
   c0:Number($('uq-c0').value),budget:Number($('iterations').value)};}
 function uqButtons(locked=busy) {
@@ -17,6 +19,7 @@ function uqButtons(locked=busy) {
   $('uq-use-stop').disabled=locked||!uqCurrent||!uqResult?.stopping?.first;
 }
 function uqInvalidate() {
+  $('uq-practical-results').hidden=true;
   clearTimeout(uqTimer);uqCurrent=false;$('uq-mc-results').hidden=true;
   $('uq-inspector').textContent='No current interval. Run Landweber or update the interval settings.';
   $('uq-components').textContent='';$('uq-interval-status').textContent='';
@@ -70,15 +73,15 @@ function uqDisplay() {
   $('uq-source').textContent=`${r.source.status.toUpperCase()}: ${r.source.reason} M = ${uf(r.source.M)} (${r.source.oracle?'calibrated from your drawing':'proposed assumption'}).`;
   $('uq-actual-bias').textContent=uf(r.diagnostics.bias_norm);
   $('uq-spectral-bias').textContent=uf(r.bounds.spectral);$('uq-global-bias').textContent=uf(r.bounds.global_bound);
-  $('uq-interval-status').textContent=r.interval_status==='conditional'?`${100*c.level}% theoretical marginal coverage conditional on the source assumption and noise-independent K. Source compatibility passed numerical checks; these are not an exact-arithmetic proof.`:`${r.interval_status==='exploratory'?'Exploratory — no theoretical coverage guarantee. ':''}${r.interval_reason||''}`;
+  $('uq-interval-status').textContent=r.interval_status==='conditional'&&r.practical?`${100*c.level}% marginal coverage conditional on the numerically checked source, retained/omitted bias, and covariance inequalities for this drawing and fixed sketch. This is an exact-reference audit, not a general randomized coverage certificate.`:r.interval_status==='conditional'?`${100*c.level}% theoretical marginal coverage conditional on the source assumption and noise-independent K. Source compatibility passed numerical checks; these are not an exact-arithmetic proof.`:`${r.interval_status==='exploratory'?'Exploratory — no theoretical coverage guarantee. ':''}${r.interval_reason||''}`;
   const s=r.stopping;
   $('uq-stop-status').textContent=s?(s.first?`First satisfying iteration: K = ${s.first}.`:`Not reached within K = 1…${c.budget}.`):`Unavailable: ${r.interval_reason}`;
   if(s){
-    const v=Math.max(...r.maps.sd.flat()),b=r.bounds.selected;
-    $('uq-stop-values').textContent=`At displayed K = ${c.k}: B_K = ${uf(b)}, c₀ v_K = ${uf(s.c0*v)} — ${b<=s.c0*v?'condition met':'condition not yet met'}.`;
+    const v=Math.max(...r.maps.interval_sd.flat()),b=r.bounds.stopping;
+    $('uq-stop-values').textContent=`At displayed K = ${c.k}: ${r.practical?'retained bias':'B_K'} = ${uf(b)}, c₀ v_K = ${uf(s.c0*v)} — ${b<=s.c0*v?'condition met':'condition not yet met'}.`;
   } else $('uq-stop-values').textContent='';
   $('uq-mc-results').hidden=!r.mc;
-  uqPlot();if(r.mc)uqMcDisplay();uqInspect();uqButtons();
+  uqPracticalDisplay();uqPlot();if(r.mc)uqMcDisplay();uqInspect();uqButtons();
 }
 function uqInspect() {
   const row=Number($('uq-row').value),col=Number($('uq-col').value);
@@ -90,7 +93,7 @@ function uqInspect() {
   const interval=r.maps.lower?`${r.interval_status==='exploratory'?'Exploratory nominal ':''}${100*r.config.level}% interval [${uf(value('lower'))}, ${uf(value('upper'))}]`:'Confidence interval unavailable.';
   $('uq-inspector').textContent=`Reconstructed value: ${uf(value('reconstruction'))}. ${interval}`;
   const width=value('half_width'),share=v=>width>0?`${(100*v/width).toFixed(1)}%`:'0%';
-  $('uq-components').textContent=r.maps.lower?`Half-width = ${uf(value('stochastic'))} (Gaussian: ${share(value('stochastic'))}) + ${uf(r.bounds.selected)} (${r.bounds.kind} bias: ${share(r.bounds.selected)}) = ${uf(width)}.` : '';
+  $('uq-components').textContent=r.maps.lower?`Half-width = ${uf(value('stochastic'))} (Gaussian: ${share(value('stochastic'))}) + ${uf(r.bounds.selected)} (${r.practical?'retained + omitted':r.bounds.kind} bias: ${share(r.bounds.selected)}) = ${uf(width)}.` : '';
   if(r.mc){
     const coverage=r.mc.coverage;
     $('uq-mc-pixel').textContent=`Selected pixel (${row}, ${col}): known truth ${uf(value('truth'))}. `+(coverage?`Empirical coverage ${uf(100*coverage.pixel[row][col])}% ± SE ${uf(100*coverage.pixel_se[row][col])} percentage points (${r.mc.trials} trials).`:'Coverage unavailable without eligible intervals.');
@@ -194,3 +197,28 @@ $('uq-density-plot').onkeydown=event=>{
   uqSelectIndex(next[event.key]);
 };
 uqPlot();
+
+function uqPracticalControls(){
+  const practical=$('uq-method').value==='practical',size=Number($('resolution').value)**2;
+  $('uq-practical-controls').hidden=!practical;$('uq-classical-controls').hidden=practical;
+  for(const id of ['uq-rank','uq-oversampling']){$(id).max=size;$(id).value=Math.min(Number($(id).value),size);}
+}
+$('uq-method').addEventListener('input',uqPracticalControls);
+$('resolution').addEventListener('input',uqPracticalControls);
+function uqPracticalDisplay(){
+  const r=uqResult,p=r.practical;$('uq-practical-results').hidden=!p;if(!p)return;
+  $('uq-practical-summary').textContent=`Rank ${r.config.retained_rank} of ${r.pixels}; p = ${r.config.oversampling}; ${r.config.probes} residual probes. `+(r.interval_status==='conditional'?'Conditional exact-reference checks passed.':`Exploratory / unavailable: ${r.interval_reason}`);
+  const rows=[
+    ['Retained bias approximation',uf(p.retained_bound)],
+    ['Omitted-bias allowance',`${uf(r.config.tail_eta*p.retained_bound)}; total bias allowance ${uf(p.allowance)}`],
+    ['Actual retained / omitted bias norms',`${uf(p.retained_bias_norm)} / ${uf(p.omitted_bias_norm)}`],
+    ['Assumption 3.9',`Retained bound: ${p.retained_pass?'passes':'FAILS'}; omitted / retained ratio ${uf(p.observed_tail_ratio)} ≤ η = ${uf(p.tail_eta)}: ${p.tail_pass?'passes':'FAILS'}`],
+    ['Corrected variance vs exact reference',`${p.covariance_pass?'passes':'FAILS'}; ${p.covariance_failed_pixels} pixels underestimated`],
+    ['Residual relative-error check',`${p.probe_event_pass?'passes':'FAILS'} at ε = ${r.config.probe_epsilon}`],
+    ['Probe count for requested δ',`${p.probe_budget_sufficient?'Sufficient at displayed K':'Not certified at displayed K'}; conservative requirement ${p.required_probes===null?'unbounded':Math.ceil(p.required_probes)} versus N = ${r.config.probes}. Exact-reference checks above determine the displayed conditional label.`],
+    ['Normal-operator approximation error',`${uf(p.approximation_error)} (paper reference β = ${uf(p.approximation_beta)})`]
+  ];
+  $('uq-practical-statistics').replaceChildren();
+  for(const [label,value] of rows){const tr=document.createElement('tr');for(const text of [label,value]){const td=document.createElement('td');td.textContent=text;tr.append(td);}$('uq-practical-statistics').append(tr);}
+}
+uqPracticalControls();

@@ -8,6 +8,7 @@ from .covariance import geometry, covariance_diagonal, finite_filter
 from .bias import source_check, spectral_bound, global_bound, stopping_curve
 from .confidence import eligibility, marginal, joint_region
 from .monte_carlo import validate
+from .practical import Practical
 
 
 def integer(value, name, low, high):
@@ -37,10 +38,19 @@ def settings(body):
                   m=number(body.get('M', 10), 'Source M', 1e-12, 1e12),
                   level=number(body.get('level', .95), 'Confidence level', .9, .99),
                   c0=number(body.get('c0', 1), 'Stopping c₀', .01, 100),
-                  budget=integer(body.get('budget', 300), 'Stopping budget', 1, 2**53-1))
+                  budget=integer(body.get('budget', 300), 'Stopping budget', 1, 2**53-1),
+                  retained_rank=integer(body.get('retained_rank', 64), 'Retained rank', 1, n*n),
+                  oversampling=integer(body.get('oversampling', 10), 'Oversampling', 4, n*n),
+                  probes=integer(body.get('probes', 100), 'Residual probes', 1, 10000),
+                  sketch_seed=integer(body.get('sketch_seed', 17), 'Sketch seed', 0, 2**32-1),
+                  probe_seed=integer(body.get('probe_seed', 23), 'Probe seed', 0, 2**32-1),
+                  probe_epsilon=number(body.get('probe_epsilon', .1), 'Residual tolerance ε', .001, .99),
+                  probe_delta=number(body.get('probe_delta', .01), 'Probe failure probability δ', .000001, .5),
+                  tail_eta=number(body.get('tail_eta', .1), 'Omitted bias ratio η', 0, 1))
     if 0 < config['sigma'] < 1e-12:
         raise ValueError('For reliable UQ arithmetic, use σ = 0 or σ ≥ 1e-12 line-integral units.')
     for key, allowed, default in [('mode', ('variance','source','oracle'), 'variance'),
+                                  ('uq_method', ('practical','classical'), 'practical'),
                                   ('bias_bound', ('spectral','global'), 'spectral'),
                                   ('stopping_mode', ('manual','automatic'), 'manual'),
                                   ('step_mode', ('paper','phase1'), 'paper'),
@@ -98,7 +108,11 @@ def experiment(body, run_mc=False, select_stopping=False):
     search_budget = c['k'] if select_stopping else c['budget']
     if select_stopping:
         c['budget'] = search_budget
-    curve = stopping(n, angles, key, c['sigma'], c['nu'], source['M'], c['c0'], search_budget, c['bias_bound']) if reason is None and search_budget > 0 else None
+    practical = Practical(c, truth, source) if c['uq_method']=='practical' else None
+    curve = None
+    if reason is None and search_budget > 0:
+        curve = (practical.stopping(search_budget) if practical else
+                 stopping(n, angles, key, c['sigma'], c['nu'], source['M'], c['c0'], search_budget, c['bias_bound']))
     selection = None
     if select_stopping:
         requested = k
@@ -122,26 +136,34 @@ def experiment(body, run_mc=False, select_stopping=False):
     spec = spectral_bound(values, omega, k, c['nu'], source['M']) if candidate else None
     global_b = float(global_bound(values[-1], k, c['nu'], source['M'])) if k > 0 and candidate and c['step_mode']=='paper' else None
     bound = spec if c['bias_bound'] == 'spectral' else global_b
-    stochastic = norm.ppf((1+c['level'])/2)*sd
+    interval_sd = sd
+    practical_audit = approximate_variance = residual_estimate = corrected_variance = None
+    if practical:
+        practical_audit, approximate_variance, residual_estimate, corrected_variance = practical.audit(k, variance)
+        interval_sd = np.sqrt(corrected_variance)
+        bound = practical_audit['allowance'] if candidate else None
+        if practical_audit['issues']:
+            reason = ' '.join(([reason] if reason else []) + practical_audit['issues'])
+    stochastic = norm.ppf((1+c['level'])/2)*interval_sd
     radius = lower = upper = None
     if k > 0 and c['sigma'] > 0 and bound is not None and np.isfinite(bound):
-        stochastic, radius, lower, upper = marginal(x, sd, bound, c['level'])
+        stochastic, radius, lower, upper = marginal(x, interval_sd, bound, c['level'])
     interval_status = ('conditional' if reason is None else 'exploratory') if lower is not None else 'unavailable'
     joint = joint_region(eta, vectors, error := x-truth, bound, c['level'], rank, reason)
     def square(v):
         return None if v is None else np.asarray(v).reshape(n,n).tolist()
     def sinogram(v):
         return v.reshape(angles, len(offsets)).T.tolist()
-    result = dict(config=c, method='Exact small-system covariance (full eigendecomposition, floating point)',
+    result = dict(config=c, method=('Paper §3.6 randomized UQ with exact small-grid audits' if practical else 'Exact small-system covariance (full eigendecomposition, floating point)'), practical=practical_audit,
                   omega=float(omega), rank=rank, pixels=n*n, rank_tolerance=tolerance,
                   normal_condition=float(values[-1]/values[0]) if rank==n*n else None,
                   source=source, interval_reason=reason, interval_status=interval_status, selection=selection, joint=joint, stopping=curve,
-                  bounds=dict(spectral=spec, global_bound=global_b, selected=bound, kind=c['bias_bound']),
+                  bounds=dict(spectral=spec, global_bound=global_b, selected=bound, kind='practical' if practical else c['bias_bound'], stopping=practical_audit['retained_bound'] if practical else bound),
                   measurements=dict(clean=sinogram(clean), noise=sinogram(noise), observed=sinogram(observed),
                                     angles=(theta*180/np.pi).tolist(), offsets=offsets.tolist()),
                   maps={name:square(v) for name,v in dict(truth=truth, reconstruction=x, clean_reconstruction=clean_x,
                        mean=mean, bias=bias, error=error, propagated_noise=x-clean_x, variance=variance, sd=sd,
-                       stochastic=stochastic, half_width=radius, lower=lower, upper=upper).items()},
+                       interval_sd=interval_sd, approximate_variance=approximate_variance, residual_estimate=residual_estimate, corrected_variance=corrected_variance, stochastic=stochastic, half_width=radius, lower=lower, upper=upper).items()},
                   diagnostics=dict(bias_norm=float(np.linalg.norm(bias)), error_norm=float(np.linalg.norm(error)),
                                    mean_identity_error=float(np.linalg.norm(mean-clean_x)),
                                    residual=float(np.linalg.norm(a@x-observed)), trace_covariance=float(variance.sum())), mc=None)

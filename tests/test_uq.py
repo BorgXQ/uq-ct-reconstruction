@@ -120,7 +120,7 @@ class StatisticalTests(unittest.TestCase):
 class UqApiTests(unittest.TestCase):
     def setUp(self):
         self.client=app.test_client()
-        self.body=dict(image=np.full((16,16),.4).tolist(),uq_resolution=16,angles=45,
+        self.body=dict(uq_method='classical',image=np.full((16,16),.4).tolist(),uq_resolution=16,angles=45,
                        iterations=10,budget=30,sigma=.02,seed=2,mode='oracle',trials=30)
 
     def test_full_workflow_and_dependency_invariance(self):

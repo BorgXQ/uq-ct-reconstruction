@@ -26,9 +26,12 @@ try {
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
   await call('Page.navigate',{url:process.argv[2]||process.env.CT_URL||'http://127.0.0.1:5000'});
   await wait("typeof sample === 'function'");
+  assert(await evaluate("$('uq-method').value==='practical' && practicalIds.every(id=>$('reconstruction-controls').contains($(id)))"),'paper practical mode and parameters are under Reconstruction');
+  await evaluate("$('uq-method').value='classical';$('uq-method').dispatchEvent(new Event('input'))");
   assert(await evaluate('sample(64).flat().every(v=>v===0)'),'initial canvas is black');
   assert(await evaluate("[...$('resolution').options].map(o=>o.value).join(',')==='16,24'"),'one shared grid selector offers only 16 and 24');
   async function gesture(x1,y1,x2=x1,y2=y1){
+    await evaluate("drawing.scrollIntoView({block:'center'})");
     const rect=await evaluate("(()=>{const r=drawing.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
     const x=rect.x+x1*rect.w/512,y=rect.y+y1*rect.h/512;
     await call('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:1});
@@ -143,6 +146,22 @@ try {
   assert(await evaluate("uqResult.config.k===1000000 && results.snapshots.length<=101 && $('iteration-label').textContent==='k = 1000000'"),'million-iteration manual run returns bounded snapshots');
   await evaluate("$('uq-stopping-mode').value='automatic';$('uq-c0').value=1;$('reconstruct').click()");await wait('!busy && uqCurrent');
   assert(await evaluate("uqResult.stopping.first!==null && uqResult.config.k===uqResult.stopping.first"),'large automatic search applies the first crossing');
+  await evaluate("$('uq-method').value='practical';$('uq-method').dispatchEvent(new Event('input'));$('uq-stopping-mode').value='automatic';$('iterations').value=1000;$('uq-rank').value=32;$('uq-tail').value=0;$('reconstruct').click()");await wait('!busy && uqCurrent');
+  assert(await evaluate("uqResult.config.uq_method==='practical' && uqResult.config.k===uqResult.stopping.first && !$('uq-practical-results').hidden && $('uq-classical-controls').hidden"),'practical mode uses its first crossing and shows assumption audits');
+  assert(await evaluate("uqResult.interval_status==='exploratory' && $('uq-practical-summary').textContent.includes('Exploratory') && $('uq-inspector').textContent.includes('Exploratory')"),'low rank with omitted bias never claims guaranteed coverage');
+  await evaluate("$('uq-practical-results').scrollIntoView({block:'center'})");
+  await call('Page.captureScreenshot',{format:'png'}).then(r=>writeFileSync('/tmp/ct-practical-checks.png',Buffer.from(r.data,'base64')));
+  await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  assert(await evaluate('document.documentElement.scrollWidth<=390'),'practical settings and audit table fit mobile width');
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+  const practicalImage=await evaluate('JSON.stringify(uqResult.maps.reconstruction)');
+  await evaluate("$('uq-probe-seed').value=42;$('uq-probe-seed').dispatchEvent(new Event('input'))");
+  assert(await evaluate("!uqCurrent && $('uq-practical-results').hidden && !$('uq-confidence-band')"),'randomization edits invalidate intervals and audits');
+  await evaluate("$('uq-run').click()");await wait('!uqBusy && uqCurrent');
+  assert(await evaluate('JSON.stringify(uqResult.maps.reconstruction)')===practicalImage,'updating the probe seed preserves the displayed Landweber reconstruction');
+  await evaluate("$('uq-rank').value=576;$('uq-tail').value=0;$('uq-run').click()");await wait('!uqBusy && uqCurrent');
+  assert(await evaluate("uqResult.interval_status==='conditional' && uqResult.practical.tail_pass && uqResult.practical.covariance_pass"),'full rank passes exact-reference checks without truncating reconstruction');
+  await evaluate("$('uq-method').value='classical';$('uq-method').dispatchEvent(new Event('input'))");
   await evaluate("$('angles').value=1;$('angles').dispatchEvent(new Event('input'))");
   assert(await evaluate("!uqCurrent && $('uq-inspector').textContent.includes('No current interval') && $('uq-mc').disabled"),'geometry edits hide stale uncertainty');
   assert(await evaluate("!$('uq-density-line') && $('uq-pixel-box').hidden"),'geometry changes clear the graph and pixel highlight');

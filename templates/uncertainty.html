@@ -30,12 +30,18 @@
       </div>
       <div><h3>Early stopping</h3>
         <p><strong>B<sub>K</sub> ≤ c₀ v<sub>K</sub></strong></p>
-        <p class="hint">Stop at the first iteration where the bias bound is no larger than c₀ times the largest pixel SD. The search runs from 1 through the iteration count in 03 / Reconstruction. This is a balancing rule, not a guarantee of minimum reconstruction error.</p>
+        <p class="hint">In practical mode, Eq. (3.31) compares the retained bias approximation with c₀ times the largest residual-corrected SD. The interval additionally includes the omitted-bias allowance (1 + η). Classical mode compares the selected full-spectrum bound with exact SD. The search runs from 1 through the iteration count in 03 / Reconstruction. This is a balancing rule, not a guarantee of minimum reconstruction error.</p>
         <p id="uq-stop-status">Awaiting reconstruction.</p>
         <p id="uq-stop-values" class="hint"></p>
         <button id="uq-use-stop" disabled>Use first stopping iteration</button>
       </div>
     </div>
+  </div>
+  <div id="uq-practical-results" hidden class="practical-results">
+    <h3>Practical uncertainty checks</h3>
+    <p id="uq-practical-summary"></p>
+    <table aria-label="Randomized uncertainty checks"><tbody id="uq-practical-statistics"></tbody></table>
+    <p class="hint">These checks use the known drawing and exact small-grid covariance. Failure leaves the candidate interval exploratory. Residual probes are part of uncertainty computation; the optional validation below instead repeats measurement noise.</p>
   </div>
   <details id="uq-validation">
     <summary>Monte Carlo validation statistics (optional)</summary>

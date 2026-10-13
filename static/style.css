@@ -6,3 +6,5 @@
 #reconstruction-controls select{width:210px;max-width:65%}
 
 .interval-figure{margin:20px 0 28px;min-width:0}.interval-figure svg{display:block;width:100%;background:#131e26;border:1px solid #344854;border-radius:6px;font:12px system-ui;cursor:crosshair}.interval-figure svg:focus-visible{outline:2px solid #ffbf69}.interval-figure figcaption{font-size:12px;color:#a3b6c0;line-height:1.7;margin-top:10px}.density-key{color:#66d6c5}.band-key{background:#66d6c538;padding:2px 5px}.reconstruction-frame{position:relative}#uq-pixel-box{position:absolute;pointer-events:none;border:2px solid #ffbf69;box-shadow:inset 0 0 0 1px #10171c,0 0 0 1px #10171c}#uq-pixel-box[hidden]{display:none}
+
+#reconstruction-controls [hidden]{display:none!important}#uq-practical-controls{margin:15px 0}#uq-practical-controls summary{cursor:pointer;color:#66d6c5}.practical-results{margin:24px 0;padding:20px;border:1px solid #30424f;border-radius:10px}.practical-results td{overflow-wrap:anywhere}.practical-results td:first-child{width:40%}

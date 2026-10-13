@@ -1,0 +1,81 @@
+// Optional smoke test using a locally installed Chromium, without npm dependencies.
+import {spawn} from 'node:child_process';
+import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {tmpdir, homedir} from 'node:os';
+import {join} from 'node:path';
+const profile=mkdtempSync(join(tmpdir(),'ct-browser-'));
+const binary=process.env.CHROMIUM_PATH || join(homedir(),'.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell');
+const child=spawn(binary,['--no-sandbox','--headless','--disable-gpu','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank']);
+let ws;
+const timeout=setTimeout(()=>{console.error('Browser check timed out');child.kill();process.exitCode=1;ws?.close();},45000);
+try {
+  const endpoint=await new Promise((resolve,reject)=>{
+    let log='';child.on('error',reject);child.on('exit',code=>reject(Error(`Chromium exited: ${code}\n${log}`)));
+    child.stderr.on('data',chunk=>{log+=chunk;const match=log.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(match)resolve(match[1]);});
+  });
+  const root=new URL(endpoint), pages=await (await fetch(`http://${root.host}/json`)).json();
+  ws=new WebSocket(pages[0].webSocketDebuggerUrl);
+  await new Promise(r=>ws.addEventListener('open',r,{once:true}));
+  let id=0;const pending=new Map(), errors=[];
+  ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(m.error):p.resolve(m.result);}if(m.method==='Runtime.exceptionThrown')errors.push(m.params);});
+  function call(method,params={}){return new Promise((resolve,reject)=>{pending.set(++id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});}
+  async function evaluate(expression){const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
+  function assert(ok,label){if(!ok)throw Error(label);console.log('PASS',label);}
+  async function wait(expression){for(let i=0;i<200;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,50));}throw Error(`Timed out: ${expression}`);}
+  await call('Runtime.enable');await call('Page.enable');
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+  await call('Page.navigate',{url:process.argv[2]||process.env.CT_URL||'http://127.0.0.1:5000'});
+  await wait("typeof sample === 'function'");
+  assert(await evaluate('sample(64).flat().every(v=>v===0)'),'initial canvas is black');
+  assert(await evaluate("[...$('resolution').options].map(o=>o.value).join(',')==='64,128,256'"),'grid choices are 64, 128, and 256');
+  async function gesture(x1,y1,x2=x1,y2=y1){
+    const rect=await evaluate("(()=>{const r=drawing.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
+    const x=rect.x+x1*rect.w/512,y=rect.y+y1*rect.h/512;
+    await call('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:1});
+    await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:rect.x+x2*rect.w/512,y:rect.y+y2*rect.h/512,button:'left',buttons:1});
+    await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:rect.x+x2*rect.w/512,y:rect.y+y2*rect.h/512,button:'left',clickCount:1});
+  }
+  await evaluate("$('shade').value=128;$('shade').oninput();");await gesture(80,80,180,80);
+  assert(await evaluate('Math.abs(sample(64)[10][15]-128/255)<.01'),'brush preserves intermediate density');
+  await evaluate("document.querySelector('[data-tool=eraser]').click()");await gesture(120,80);
+  assert(await evaluate('ctx.getImageData(120,80,1,1).data[0]===0'),'eraser restores black');
+  await evaluate("$('clear').click();document.querySelector('[data-tool=square]').click();$('shade').value=255");await gesture(80,80,180,120);
+  assert(await evaluate('sample(64)[20][20]===1 && sample(64)[24][20]===0'),'square has equal sides');
+  await gesture(240,80,275,115);
+  await evaluate("document.querySelector('[data-tool=circle]').click();$('shade').value=128");await gesture(350,330,395,330);
+  assert(await evaluate('Math.abs(sample(64)[41][43]-128/255)<.01'),'filled circle works');
+  await evaluate("document.querySelector('[data-tool=fill]').click();$('shade').value=64");await gesture(100,100);
+  assert(await evaluate('Math.abs(sample(64)[15][15]-64/255)<.01 && sample(64)[12][32]===1 && sample(64)[0][0]===0 && Math.abs(sample(64)[41][43]-128/255)<.01'),'fill stays in connected region and preserves disconnected equal shades');
+  const before=await evaluate('drawing.toDataURL()');
+  await evaluate("$('project').click()");await wait("!busy && projection!==null");
+  assert(await evaluate("!$('reconstruct').disabled && $('geometry').textContent.includes('90 angles')"),'projection completes');
+  await evaluate("$('reconstruct').click()");await wait('!busy && results!==null');
+  assert(await evaluate('results.history.at(-1).residual < results.history[0].residual'),'browser reconstruction converges');
+  assert(await evaluate('drawing.toDataURL()')===before,'calculation preserves original');
+  await evaluate("$('snapshot').value=0;$('snapshot').oninput()");
+  assert(await evaluate("$('iteration-label').textContent==='k = 0' && $('error').textContent==='100.00%'"),'saved iteration slider updates diagnostics');
+  await evaluate("$('snapshot').value=$('snapshot').max;$('snapshot').oninput()");
+  await call('Page.captureScreenshot',{format:'png'}).then(r=>writeFileSync('/tmp/ct-laboratory-desktop.png',Buffer.from(r.data,'base64')));
+  await evaluate("$('angles').value=45;$('angles').dispatchEvent(new Event('input'))");
+  assert(await evaluate("document.body.classList.contains('stale') && $('reconstruct').disabled && $('snapshot').disabled"),'geometry changes invalidate old results');
+  await evaluate("$('clear').click();$('project').click()");await wait('!busy && projection.version===version');
+  await evaluate("$('iterations').value=5;$('reconstruct').click()");await wait('!busy && results!==null');
+  assert(await evaluate("$('error').textContent.includes('zero ground truth') && results.history.at(-1).residual===0"),'black image is handled safely');
+  await evaluate("$('noise').value=.05;$('noise').dispatchEvent(new Event('input'))");
+  assert(await evaluate("$('reconstruct').disabled && document.body.classList.contains('stale')"),'noise changes invalidate measurements');
+  for(const n of [128,256]) {
+    await evaluate(`$('resolution').value=${n};$('resolution').dispatchEvent(new Event('input'));$('project').click()`);
+    await wait('!busy && projection.version===version');
+    assert(await evaluate("$('sino-scale').textContent.includes('black = -')"),`${n} noisy sinogram includes negative measurements`);
+    await evaluate("$('reconstruct').click()");await wait('!busy && results!==null');
+    assert(await evaluate(`results.snapshots.at(-1).image.length===${n} && results.history.at(-1).residual>0`),`${n} grid reconstructs noisy data`);
+  }
+  const noisyResidual=await evaluate('results.history[0].residual');
+  await evaluate("$('iterations').value=8;$('reconstruct').click()");await wait('!busy');
+  assert(await evaluate('results.history[0].residual')===noisyResidual,'iteration changes reuse identical noise');
+  await evaluate("$('noise-seed').value=12;$('noise-seed').dispatchEvent(new Event('input'))");
+  assert(await evaluate("$('reconstruct').disabled"),'noise seed changes invalidate measurements');
+  await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  assert(await evaluate('document.documentElement.scrollWidth<=390'),'mobile layout has no horizontal overflow');
+  assert(errors.length===0,'no browser exceptions');
+} finally {clearTimeout(timeout);ws?.close();child.kill();await new Promise(r=>child.exitCode===null && child.signalCode===null?child.once('exit',r):r());rmSync(profile,{recursive:true,force:true});}

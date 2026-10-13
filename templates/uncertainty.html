@@ -1,10 +1,15 @@
 <section id="uq" class="uq-section" aria-labelledby="uq-title">
   <h2 id="uq-title">Pixelwise confidence intervals</h2>
   <p id="uq-status" role="status" aria-live="polite">Generate projections, then run Landweber to calculate the intervals.</p>
+  <figure class="interval-figure">
+    <svg id="uq-density-plot" viewBox="0 0 1000 340" tabindex="0" role="img" aria-label="Reconstructed density and pixelwise confidence intervals" aria-describedby="uq-plot-caption"></svg>
+    <figcaption id="uq-plot-caption"><span class="density-key">Reconstructed density</span> · <span class="band-key">Shaded pixelwise confidence interval</span>. Pixels run row by row, starting at 0; faint separators mark row boundaries. Hover or tap to select a pixel; use arrow keys when the plot is focused.</figcaption>
+    <p id="uq-plot-status" class="hint" role="status">Run Landweber to plot all pixel densities and their intervals.</p>
+  </figure>
   <div class="interval-layout">
     <div class="pixel-card">
       <h3>Selected pixel <span id="uq-pixel-label">(0, 0)</span></h3>
-      <p class="hint">Click or hover over the reconstruction, or choose a row and column (zero-based).</p>
+      <p class="hint">Hover or tap the graph or reconstruction, or choose a row and column (zero-based). The amber box marks the selected pixel.</p>
       <label>Row <input id="uq-row" type="number" value="0" min="0" max="15"> Column <input id="uq-col" type="number" value="0" min="0" max="15"></label>
       <p id="uq-inspector" class="interval-value" aria-live="polite">Awaiting reconstruction.</p>
       <p id="uq-components" class="hint"></p>

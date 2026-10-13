@@ -100,6 +100,7 @@ try {
   assert(await evaluate("uqResult.mc.trials===40 && uqResult.mc.coverage!==null"),'Monte Carlo validates the displayed reconstruction');
   await evaluate("$('uq-policy').value='exploratory';$('uq-policy').dispatchEvent(new Event('input'));$('uq-run').click()");await wait('!uqBusy && uqCurrent');
   assert(await evaluate('uqResult.maps.lower===null && uqResult.stopping===null'),'post-selection K disables fixed-K confidence');
+  assert(await evaluate("!$('uq-confidence-band') && !!$('uq-density-line') && $('uq-plot-status').textContent.includes('unavailable')"),'unavailable intervals show density without a misleading band');
   await evaluate("$('uq-policy').value='fixed';$('uq-run').click()");await wait('!uqBusy && uqCurrent');
   assert(await evaluate("uqResult.config.mode==='oracle' && uqResult.config.budget===Number($('iterations').value)"),'drawing calibration and stopping budget follow reconstruction settings');
   assert(await evaluate("['uq-nu','uq-policy','uq-c0'].every(id=>$('reconstruction-controls').contains($(id))) && !document.querySelector('#uq-mode,#uq-M,#uq-budget')"),'reconstruction owns the source and stopping controls');
@@ -116,6 +117,16 @@ try {
   const pixelPoint=await evaluate("(()=>{const r=$('reconstruction').getBoundingClientRect(),n=uqResult.config.n;return {x:r.x+r.width*7.5/n,y:r.y+r.height*5.5/n};})()");
   await call('Input.dispatchMouseEvent',{type:'mouseMoved',...pixelPoint});
   assert(await evaluate("$('uq-row').value==='5' && $('uq-col').value==='7' && $('uq-inspector').textContent.includes('99% interval')"),'hovering the reconstruction selects its pixel confidence interval');
+  assert(await evaluate("$('uq').contains($('uq-density-plot')) && $('uq-density-plot').compareDocumentPosition(document.querySelector('.interval-layout')) & Node.DOCUMENT_POSITION_FOLLOWING"),'density graph sits above interval details inside the section');
+  assert(await evaluate("$('uq-confidence-band')!==null && $('uq-density-line').getAttribute('d').split('M').length===2 && uqPlotScale.values.length===576"),'graph includes all 576 reconstructed densities and the confidence band');
+  await evaluate("$('uq-density-plot').scrollIntoView({block:'center'})");
+  const graphPoint=await evaluate("(()=>{const p=new DOMPoint(uqPlotScale.x(23),100).matrixTransform($('uq-density-plot').getScreenCTM());return {x:p.x,y:p.y};})()");
+  await call('Input.dispatchMouseEvent',{type:'mouseMoved',...graphPoint});
+  assert(await evaluate("$('uq-row').value==='0' && $('uq-col').value==='23' && !$('uq-pixel-box').hidden && parseFloat($('uq-pixel-box').style.left)>95 && $('uq-inspector').textContent.includes('99% interval')"),'graph hover maps index to the correct image pixel and interval');
+  await evaluate("$('uq-density-plot').focus()");
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowRight',code:'ArrowRight'});
+  assert(await evaluate("$('uq-row').value==='1' && $('uq-col').value==='0' && $('uq-pixel-box').style.left==='0%'"),'graph keyboard selection crosses image row boundaries correctly');
+  await evaluate("uqSelectIndex(127)");
   assert(await evaluate("document.querySelectorAll('canvas').length===3 && !document.getElementById('uq-joint') && !document.getElementById('graph')"),'only original, sinogram, and reconstruction canvases remain');
   await evaluate("$('uq-validation').open=true;$('uq-mc').click()");await wait('!uqBusy && uqResult.mc!==null');
   assert(await evaluate("$('uq-mc-statistics').children.length===4 && $('uq-mc-pixel').textContent.includes('Selected pixel (5, 7)')"),'optional validation is a compact table with selected-pixel coverage');
@@ -123,6 +134,7 @@ try {
   await call('Page.captureScreenshot',{format:'png'}).then(r=>writeFileSync('/tmp/ct-unified-details.png',Buffer.from(r.data,'base64')));
   await evaluate("$('angles').value=1;$('angles').dispatchEvent(new Event('input'))");
   assert(await evaluate("!uqCurrent && $('uq-inspector').textContent.includes('No current interval') && $('uq-mc').disabled"),'geometry edits hide stale uncertainty');
+  assert(await evaluate("!$('uq-density-line') && $('uq-pixel-box').hidden"),'geometry changes clear the graph and pixel highlight');
   await evaluate("$('project').click()");await wait('!busy && projection.version===version');
   await evaluate("$('reconstruct').click()");await wait('!busy && uqCurrent');
   assert(await evaluate("uqResult.source.status==='failed' && !uqResult.joint.available"),'sparse geometry rejects incompatible source guarantees');

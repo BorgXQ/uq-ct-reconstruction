@@ -134,7 +134,7 @@ $('reconstruct').onclick = async () => {
     results=await request('reconstruct',{...projection,iterations:Number($('iterations').value),...uqSettings()});
     results.uncertainty.settings=uqSettings();
     $('snapshot').max=results.snapshots.length-1;$('snapshot').value=results.snapshots.length-1;
-    showSnapshot();$('status').textContent=`Reconstruction ready. Select a pixel to inspect its confidence interval. Inspect ${results.snapshots.length} saved iterates using the slider.`;
+    showSnapshot();$('status').textContent=`${results.uncertainty.selection.message} Select a pixel to inspect its confidence interval. Inspect ${results.snapshots.length} saved iterates using the slider.`;
   } catch(error){$('status').textContent=error.message;} finally {setBusy(false);}
 };
 function showSnapshot() {

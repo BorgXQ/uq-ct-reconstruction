@@ -41,6 +41,8 @@ def settings(body):
     if 0 < config['sigma'] < 1e-12:
         raise ValueError('For reliable UQ arithmetic, use σ = 0 or σ ≥ 1e-12 line-integral units.')
     for key, allowed, default in [('mode', ('variance','source','oracle'), 'variance'),
+                                  ('bias_bound', ('spectral','global'), 'spectral'),
+                                  ('stopping_mode', ('manual','automatic'), 'manual'),
                                   ('step_mode', ('paper','phase1'), 'paper'),
                                   ('k_policy', ('fixed','exploratory'), 'fixed')]:
         value = body.get(key, default)
@@ -73,34 +75,54 @@ def reconstruction(n, angles, truth_bytes, sigma, seed, k, step_mode):
 
 
 @lru_cache(maxsize=8)
-def stopping(n, angles, truth_bytes, sigma, nu, m, c0, budget):
+def stopping(n, angles, truth_bytes, sigma, nu, m, c0, budget, bound_kind):
     _, _, _, _, values, vectors, _ = geometry(n, angles)
     return stopping_curve(values, vectors, 1/(2*values[-1]), sigma, nu, m, c0,
-                          budget, np.frombuffer(truth_bytes, dtype=np.float64))
+                          budget, np.frombuffer(truth_bytes, dtype=np.float64), bound_kind)
 
 
-def experiment(body, run_mc=False):
+def experiment(body, run_mc=False, select_stopping=False):
     truth, c = settings(body)
     n, angles, k = c['n'], c['angles'], c['k']
     a, theta, offsets, _, values, vectors, tolerance = geometry(n, angles)
     key = truth.tobytes()
     clean, noise, observed = observation(n, angles, key, c['sigma'], c['seed'])
-    omega, x, clean_x, mean, variance, eta = reconstruction(n, angles, key, c['sigma'], c['seed'], k, c['step_mode'])
-    sd = np.sqrt(variance)
     source = source_check(values, vectors, tolerance, truth, c['nu'], c['m'], c['mode'])
     rank = int(np.count_nonzero(values > tolerance))
-    reason = ('K = 0 is a constant zero estimate: SD is zero; confidence procedures are disabled.' if k == 0
-              else eligibility(source, c['sigma'], c['step_mode'], c['k_policy']))
+    reason = eligibility(source, c['sigma'], c['step_mode'], c['k_policy'])
+    search_budget = c['k'] if select_stopping else c['budget']
+    if select_stopping:
+        c['budget'] = search_budget
+    curve = stopping(n, angles, key, c['sigma'], c['nu'], source['M'], c['c0'], search_budget, c['bias_bound']) if reason is None and search_budget > 0 else None
+    selection = None
+    if select_stopping:
+        requested = k
+        if c['stopping_mode'] == 'automatic':
+            k = curve['first'] if curve and curve['first'] else requested
+            message = (f"Automatic stopping: first crossing at K = {k}." if curve and curve['first']
+                       else f"Automatic stopping: no crossing within {requested} iterations; used the iteration limit." if curve
+                       else f"Automatic stopping unavailable: {reason} Used the iteration limit {requested}.")
+        else:
+            message = f"Manual stopping: used K = {k}."
+        c['k'] = k
+        selection = dict(mode=c['stopping_mode'], requested=requested, applied=k,
+                         reached=bool(curve and curve['first']), message=message)
+    omega, x, clean_x, mean, variance, eta = reconstruction(n, angles, key, c['sigma'], c['seed'], k, c['step_mode'])
+    sd = np.sqrt(variance)
+    if k == 0:
+        reason = 'K = 0 is a constant zero estimate: SD is zero; confidence procedures are disabled.'
+        curve = None
     bias = mean-truth
-    error = x-truth
-    spec = spectral_bound(values, omega, k, c['nu'], source['M']) if source['status']=='verified' else None
-    bound = float(global_bound(values[-1], k, c['nu'], source['M'])) if k > 0 and source['status']=='verified' and c['step_mode']=='paper' else None
+    candidate = c['mode'] != 'variance' and np.isfinite(source['M'])
+    spec = spectral_bound(values, omega, k, c['nu'], source['M']) if candidate else None
+    global_b = float(global_bound(values[-1], k, c['nu'], source['M'])) if k > 0 and candidate and c['step_mode']=='paper' else None
+    bound = spec if c['bias_bound'] == 'spectral' else global_b
     stochastic = norm.ppf((1+c['level'])/2)*sd
     radius = lower = upper = None
-    if reason is None:
+    if k > 0 and c['sigma'] > 0 and bound is not None and np.isfinite(bound):
         stochastic, radius, lower, upper = marginal(x, sd, bound, c['level'])
-    joint = joint_region(eta, vectors, error, bound, c['level'], rank, reason)
-    curve = stopping(n, angles, key, c['sigma'], c['nu'], source['M'], c['c0'], c['budget']) if reason is None else None
+    interval_status = ('conditional' if reason is None else 'exploratory') if lower is not None else 'unavailable'
+    joint = joint_region(eta, vectors, error := x-truth, bound, c['level'], rank, reason)
     def square(v):
         return None if v is None else np.asarray(v).reshape(n,n).tolist()
     def sinogram(v):
@@ -108,8 +130,8 @@ def experiment(body, run_mc=False):
     result = dict(config=c, method='Exact small-system covariance (full eigendecomposition, floating point)',
                   omega=float(omega), rank=rank, pixels=n*n, rank_tolerance=tolerance,
                   normal_condition=float(values[-1]/values[0]) if rank==n*n else None,
-                  source=source, interval_reason=reason, joint=joint, stopping=curve,
-                  bounds=dict(spectral=spec, global_bound=bound),
+                  source=source, interval_reason=reason, interval_status=interval_status, selection=selection, joint=joint, stopping=curve,
+                  bounds=dict(spectral=spec, global_bound=global_b, selected=bound, kind=c['bias_bound']),
                   measurements=dict(clean=sinogram(clean), noise=sinogram(noise), observed=sinogram(observed),
                                     angles=(theta*180/np.pi).tolist(), offsets=offsets.tolist()),
                   maps={name:square(v) for name,v in dict(truth=truth, reconstruction=x, clean_reconstruction=clean_x,

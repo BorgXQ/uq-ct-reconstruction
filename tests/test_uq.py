@@ -148,7 +148,12 @@ class UqApiTests(unittest.TestCase):
         for changes in [{'mode':'variance'},{'mode':'source','M':1e-12},{'sigma':0},
                         {'step_mode':'phase1'},{'k_policy':'exploratory'}]:
             r=self.client.post('/api/uq',json=self.body|changes).json
-            self.assertIsNone(r['maps']['lower'])
+            if changes.get('mode')=='variance' or changes.get('sigma')==0:
+                self.assertIsNone(r['maps']['lower'])
+                self.assertEqual(r['interval_status'],'unavailable')
+            else:
+                self.assertIsNotNone(r['maps']['lower'])
+                self.assertEqual(r['interval_status'],'exploratory')
             self.assertIsNone(r['stopping'])
             self.assertFalse(r['joint']['available'])
             self.assertTrue(r['interval_reason'])
@@ -171,9 +176,64 @@ class UqApiTests(unittest.TestCase):
         self.assertIsNone(r['maps']['lower'])
         self.assertFalse(r['joint']['available'])
 
+    def test_selected_bound_and_actual_bias(self):
+        r=experiment(self.body)
+        self.assertEqual(r['bounds']['kind'],'spectral')
+        self.assertEqual(r['interval_status'],'conditional')
+        b=r['bounds']
+        actual=np.linalg.norm(np.array(r['maps']['clean_reconstruction'])-np.array(self.body['image']))
+        self.assertAlmostEqual(actual,r['diagnostics']['bias_norm'])
+        self.assertLessEqual(actual,b['spectral']+1e-10)
+        self.assertLessEqual(b['spectral'],b['global_bound']+1e-10)
+        np.testing.assert_allclose(np.array(r['maps']['half_width']),np.array(r['maps']['stochastic'])+b['spectral'])
+        from uq.covariance import geometry
+        values=geometry(16,45)[4]
+        expected=[spectral_bound(values,r['omega'],k,.5,r['source']['M']) for k in r['stopping']['iterations']]
+        np.testing.assert_allclose(r['stopping']['bound'],expected)
+        g=experiment(self.body|{'bias_bound':'global'})
+        self.assertEqual(g['bounds']['selected'],g['bounds']['global_bound'])
+        np.testing.assert_allclose(g['stopping']['bound'],global_bound(values[-1],np.arange(1,31),.5,g['source']['M']))
+
+    def test_automatic_and_manual_stopping(self):
+        body=self.body|{'iterations':100,'c0':100,'stopping_mode':'automatic'}
+        for kind in ['spectral','global']:
+            auto=self.client.post('/api/reconstruct',json=body|{'bias_bound':kind}).json
+            r=auto['uncertainty']; first=r['stopping']['first']
+            self.assertIsNotNone(first)
+            self.assertEqual(r['config']['k'],first)
+            self.assertEqual(auto['snapshots'][-1]['iteration'],first)
+            np.testing.assert_allclose(auto['snapshots'][-1]['image'],r['maps']['reconstruction'])
+            prior=first-1
+            self.assertTrue(all(b>100*v for b,v in zip(r['stopping']['bound'][:prior],r['stopping']['max_sd'][:prior])))
+            repeat=self.client.post('/api/reconstruct',json=body|{'bias_bound':kind,'seed':99}).json
+            self.assertEqual(repeat['uncertainty']['config']['k'],first)
+        manual=self.client.post('/api/reconstruct',json=body|{'stopping_mode':'manual'}).json
+        self.assertEqual(manual['snapshots'][-1]['iteration'],100)
+        capped=self.client.post('/api/reconstruct',json=body|{'iterations':1,'c0':.01}).json['uncertainty']
+        self.assertIsNone(capped['stopping']['first'])
+        self.assertEqual(capped['config']['k'],1)
+        self.assertIn('no crossing',capped['selection']['message'])
+        failed=self.client.post('/api/reconstruct',json=body|{'mode':'source','M':1e-12}).json['uncertainty']
+        self.assertEqual(failed['interval_status'],'exploratory')
+        self.assertIn('unavailable',failed['selection']['message'])
+        self.assertEqual(failed['config']['k'],100)
+
+    def test_unverified_source_never_claims_coverage(self):
+        from unittest.mock import patch
+        original=source_check
+        def unverified(*args):
+            result=original(*args);result.update(status='unverified',reason='Numerical compatibility is uncertain.')
+            return result
+        with patch('uq.source_check',side_effect=unverified):
+            r=experiment(self.body)
+        self.assertEqual(r['interval_status'],'exploratory')
+        self.assertIsNotNone(r['maps']['lower'])
+        self.assertIsNone(r['stopping'])
+        self.assertFalse(r['joint']['available'])
+
     def test_validation(self):
         for changes in [{'uq_resolution':64},{'uq_resolution':17},{'sigma':float('nan')},{'sigma':1e-300},
-                        {'sigma':-1},{'nu':0},{'M':0},{'budget':1001},{'mode':'bad'},
+                        {'sigma':-1},{'nu':0},{'M':0},{'budget':1001},{'mode':'bad'},{'bias_bound':'bad'},{'stopping_mode':'bad'},
                         {'trials':501},{'mc_seed':-1},{'iterations':True}]:
             response=self.client.post('/api/uq-mc',json=self.body|changes)
             self.assertEqual(response.status_code,400,(changes,response.json))

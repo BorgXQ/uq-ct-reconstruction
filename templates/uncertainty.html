@@ -21,6 +21,12 @@
         <p class="hint">Assumes x = (AᵀA)<sup>ν</sup>w with ‖w‖ ≤ M. M is always calibrated from your drawing. Compatibility is checked numerically; this calibration requires known ground truth.</p>
         <button id="uq-run" disabled>Update intervals & stopping rule</button>
         <p id="uq-source" class="hint">Source condition has not been checked.</p>
+        <table aria-label="Bias comparison"><tbody>
+          <tr><th>Actual bias norm</th><td id="uq-actual-bias">—</td></tr>
+          <tr><th>Spectral bound</th><td id="uq-spectral-bias">—</td></tr>
+          <tr><th>Global bound</th><td id="uq-global-bias">—</td></tr>
+        </tbody></table>
+        <p class="hint">Actual bias is the noiseless reconstruction minus the drawing, measured in the image-wide Euclidean norm. Failed or unverified source assumptions make the candidate bounds and intervals exploratory.</p>
       </div>
       <div><h3>Early stopping</h3>
         <p><strong>B<sub>K</sub> ≤ c₀ v<sub>K</sub></strong></p>

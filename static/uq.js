@@ -1,10 +1,10 @@
 'use strict';
 let uqResult=null, uqPayload=null, uqCurrent=false, uqBusy=false, uqTimer=null;
 const uf = value => value===null || value===undefined ? 'unavailable' : Number(value).toPrecision(5);
-const uqIds=['uq-policy','uq-nu','uq-level','uq-c0','iterations'];
+const uqIds=['uq-policy','uq-nu','uq-level','uq-c0','iterations','uq-bound','uq-stopping-mode'];
 function uqValid(){return uqIds.every(id=>$(id).reportValidity());}
 function uqSettings(){return {k_policy:$('uq-policy').value,mode:'oracle',
-  nu:Number($('uq-nu').value),level:Number($('uq-level').value),
+  bias_bound:$('uq-bound').value,stopping_mode:$('uq-stopping-mode').value,nu:Number($('uq-nu').value),level:Number($('uq-level').value),
   c0:Number($('uq-c0').value),budget:Number($('iterations').value)};}
 function uqButtons(locked=busy) {
   const available=projection?.version===version && !!results;
@@ -16,6 +16,7 @@ function uqInvalidate() {
   clearTimeout(uqTimer);uqCurrent=false;$('uq-mc-results').hidden=true;
   $('uq-inspector').textContent='No current interval. Run Landweber or update the interval settings.';
   $('uq-components').textContent='';$('uq-interval-status').textContent='';
+  for(const id of ['uq-actual-bias','uq-spectral-bias','uq-global-bias'])$(id).textContent='—';
   $('uq-source').textContent='Source condition has not been checked for the current settings.';
   $('uq-stop-status').textContent='Awaiting current calculation.';$('uq-stop-values').textContent='';
   $('uq-status').textContent='Run Landweber above to calculate confidence intervals.';
@@ -57,17 +58,19 @@ async function uqRun(mc=false) {
 }
 $('uq-run').onclick=()=>uqRun();
 $('uq-mc').onclick=()=>uqRun(true);
-$('uq-use-stop').onclick=()=>{if(!uqCurrent||!uqResult.stopping?.first)return;$('iterations').value=uqResult.stopping.first;$('uq-policy').value='fixed';$('reconstruct').onclick();};
+$('uq-use-stop').onclick=()=>{if(!uqCurrent||!uqResult.stopping?.first)return;$('iterations').value=uqResult.stopping.first;$('uq-policy').value='fixed';$('uq-stopping-mode').value='manual';$('reconstruct').onclick();};
 function uqDisplay() {
   const r=uqResult,c=r.config;
   $('uq-row').max=$('uq-col').max=c.n-1;
   $('uq-row').value=Math.min(Number($('uq-row').value),c.n-1);$('uq-col').value=Math.min(Number($('uq-col').value),c.n-1);
   $('uq-source').textContent=`${r.source.status.toUpperCase()}: ${r.source.reason} M = ${uf(r.source.M)} (${r.source.oracle?'calibrated from your drawing':'proposed assumption'}).`;
-  $('uq-interval-status').textContent=r.interval_reason||`${100*c.level}% marginal confidence, conditional on the source assumption. Calculated from the exact covariance and paper bias bound.`;
+  $('uq-actual-bias').textContent=uf(r.diagnostics.bias_norm);
+  $('uq-spectral-bias').textContent=uf(r.bounds.spectral);$('uq-global-bias').textContent=uf(r.bounds.global_bound);
+  $('uq-interval-status').textContent=r.interval_status==='conditional'?`${100*c.level}% theoretical marginal coverage conditional on the source assumption and noise-independent K. Source compatibility passed numerical checks; these are not an exact-arithmetic proof.`:`${r.interval_status==='exploratory'?'Exploratory — no theoretical coverage guarantee. ':''}${r.interval_reason||''}`;
   const s=r.stopping;
   $('uq-stop-status').textContent=s?(s.first?`First satisfying iteration: K = ${s.first}.`:`Not reached within K = 1…${c.budget}.`):`Unavailable: ${r.interval_reason}`;
   if(s){
-    const v=Math.max(...r.maps.sd.flat()),b=r.bounds.global_bound;
+    const v=Math.max(...r.maps.sd.flat()),b=r.bounds.selected;
     $('uq-stop-values').textContent=`At displayed K = ${c.k}: B_K = ${uf(b)}, c₀ v_K = ${uf(s.c0*v)} — ${b<=s.c0*v?'condition met':'condition not yet met'}.`;
   } else $('uq-stop-values').textContent='';
   $('uq-mc-results').hidden=!r.mc;
@@ -80,9 +83,10 @@ function uqInspect() {
   if(!uqResult||!uqCurrent||row>=uqResult.config.n||col>=uqResult.config.n)return;
   uqHighlight(row,col);
   const r=uqResult,value=name=>r.maps[name]?.[row]?.[col];
-  const interval=r.maps.lower?`${100*r.config.level}% interval [${uf(value('lower'))}, ${uf(value('upper'))}]`:'Confidence interval unavailable.';
+  const interval=r.maps.lower?`${r.interval_status==='exploratory'?'Exploratory nominal ':''}${100*r.config.level}% interval [${uf(value('lower'))}, ${uf(value('upper'))}]`:'Confidence interval unavailable.';
   $('uq-inspector').textContent=`Reconstructed value: ${uf(value('reconstruction'))}. ${interval}`;
-  $('uq-components').textContent=r.maps.lower?`Half-width = ${uf(value('stochastic'))} (noise allowance) + ${uf(r.bounds.global_bound)} (bias bound) = ${uf(value('half_width'))}.` : '';
+  const width=value('half_width'),share=v=>width>0?`${(100*v/width).toFixed(1)}%`:'0%';
+  $('uq-components').textContent=r.maps.lower?`Half-width = ${uf(value('stochastic'))} (Gaussian: ${share(value('stochastic'))}) + ${uf(r.bounds.selected)} (${r.bounds.kind} bias: ${share(r.bounds.selected)}) = ${uf(width)}.` : '';
   if(r.mc){
     const coverage=r.mc.coverage;
     $('uq-mc-pixel').textContent=`Selected pixel (${row}, ${col}): known truth ${uf(value('truth'))}. `+(coverage?`Empirical coverage ${uf(100*coverage.pixel[row][col])}% ± SE ${uf(100*coverage.pixel_se[row][col])} percentage points (${r.mc.trials} trials).`:'Coverage unavailable without eligible intervals.');
@@ -154,7 +158,7 @@ function uqPlot() {
   svg.append(uqSvg('text',{transform:'translate(18 155) rotate(-90)','text-anchor':'middle',fill:'#bdcbd3'},'Density'));
   svg.append(uqSvg('line',{id:'uq-plot-cursor',y1:top,y2:bottom,stroke:'#ffbf69','stroke-dasharray':'4 3'}));
   svg.append(uqSvg('circle',{id:'uq-plot-point',r:4,fill:'#ffbf69',stroke:'#10171c','stroke-width':1.5}));
-  $('uq-plot-status').textContent=lower?`${100*r.config.level}% pixelwise intervals for all ${values.length} pixels; raw bounds are shown without clipping. This is not a simultaneous confidence band.`:`Reconstructed densities for all ${values.length} pixels. Confidence band unavailable: ${r.interval_reason||'no eligible intervals.'}`;
+  $('uq-plot-status').textContent=lower?`${r.interval_status==='exploratory'?'Exploratory nominal ':''}${100*r.config.level}% pixelwise intervals for all ${values.length} pixels; raw bounds are shown without clipping. This is not a simultaneous confidence band.`:`Reconstructed densities for all ${values.length} pixels. Confidence band unavailable: ${r.interval_reason||'no eligible intervals.'}`;
 }
 function uqHighlight(row,col) {
   if(!uqPlotScale)return;

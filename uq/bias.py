@@ -37,11 +37,12 @@ def global_bound(largest, k, nu, m):
                   + k*np.log(k) - (nu+k)*np.log(nu+k))
 
 
-def stopping_curve(values, vectors, omega, sigma, nu, m, c0, budget, truth):
+def stopping_curve(values, vectors, omega, sigma, nu, m, c0, budget, truth, bound_kind="spectral"):
     ks = np.arange(1, budget + 1)
     etas = np.column_stack([covariance_eigenvalues(values, omega, int(k), sigma) for k in ks])
     max_sd = np.sqrt(np.max((vectors*vectors) @ etas, axis=0))
-    bounds = global_bound(values[-1], ks, nu, m)
+    bounds = (np.array([spectral_bound(values, omega, int(k), nu, m) for k in ks])
+              if bound_kind == "spectral" else global_bound(values[-1], ks, nu, m))
     coeff = vectors.T @ truth
     actual_bias = np.linalg.norm((1-omega*values[:, None])**ks * coeff[:, None], axis=0)
     crossings = np.flatnonzero(bounds <= c0 * max_sd)

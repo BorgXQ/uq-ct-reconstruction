@@ -3,8 +3,9 @@ const $ = id => document.getElementById(id);
 const drawing = $('drawing'), ctx = drawing.getContext('2d', {willReadFrequently:true});
 let tool = 'brush', drag = null, version = 0, projection = null, results = null, busy = false;
 ctx.fillRect(0, 0, 512, 512);
-function invalidate() {
+function invalidate(event) {
   version++;
+  window.dispatchEvent(new CustomEvent('experiment-edit', {detail:event?.target?.id || 'drawing'}));
   document.body.classList.toggle('stale', !!projection);
   $('reconstruct').disabled = true;
   $('snapshot').disabled = true;
@@ -80,8 +81,12 @@ function sample(n) {
   const data=ctx.getImageData(0,0,512,512).data, block=512/n;
   return Array.from({length:n},(_,row)=>Array.from({length:n},(_,col)=>{
     let total=0;
-    for(let y=row*block;y<(row+1)*block;y++) for(let x=col*block;x<(col+1)*block;x++) total+=data[(y*512+x)*4];
-    return total/(block*block*255);
+    const top=row*block,bottom=(row+1)*block,left=col*block,right=(col+1)*block;
+    for(let y=Math.floor(top);y<Math.ceil(bottom);y++) for(let x=Math.floor(left);x<Math.ceil(right);x++) {
+      const overlapY=Math.min(y+1,bottom)-Math.max(y,top),overlapX=Math.min(x+1,right)-Math.max(x,left);
+      total+=data[(y*512+x)*4]*overlapX*overlapY;
+    }
+    return Math.max(0,Math.min(1,total/(block*block*255)));
   }));
 }
 function render(canvas, values, scale=1, minimum=0) {
@@ -91,9 +96,9 @@ function render(canvas, values, scale=1, minimum=0) {
   c.putImageData(img,0,0);const out=canvas.getContext('2d');out.imageSmoothingEnabled=false;out.drawImage(off,0,0,canvas.width,canvas.height);
 }
 function clearResults() {
+  window.dispatchEvent(new Event('reconstruction-cleared'));
   results=null; $('snapshot').disabled=true; $('snapshot').max=0;
-  for(const id of ['reconstruction','graph']) {const c=$(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}
-  for(const id of ['residual','error']) $(id).textContent='—';
+  for(const id of ['reconstruction']) {const c=$(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}
   $('iteration-label').textContent='k = 0';
 }
 async function request(action,payload) {
@@ -101,14 +106,15 @@ async function request(action,payload) {
   const data=await response.json();if(!response.ok) throw new Error(data.error || 'Calculation failed.');return data;
 }
 function setBusy(value) {
-  busy=value;$('project').disabled=value;$('reconstruct').disabled=value||!projection||projection.version!==version;
+  window.dispatchEvent(new CustomEvent('calculation-busy', {detail:value}));
+  busy=value;$('resample').disabled=value;$('project').disabled=value;$('reconstruct').disabled=value||!projection||projection.version!==version;
   $('snapshot').disabled=value||!results||projection?.version!==version;
   drawing.style.pointerEvents=value?'none':'';
   document.querySelectorAll('.controls input,.controls select,.tools button').forEach(el=>el.disabled=value);
 }
 $('project').onclick = async () => {
   if(busy || !['angles','noise','noise-seed'].every(id => $(id).reportValidity())) return;
-  const current={image:sample(Number($('resolution').value)),angles:Number($('angles').value),noise_std:Number($('noise').value),noise_seed:Number($('noise-seed').value),version};
+  const current={image:sample(Number($('resolution').value)),angles:Number($('angles').value),noise_std:Number($('noise').value),noise_seed:Number($('noise-seed').value),step_mode:'paper',version};
   setBusy(true);$('status').textContent='Building ray–pixel intersections and calculating projections…';
   try {
     const data=await request('project',current);projection=current;clearResults();
@@ -118,38 +124,24 @@ $('project').onclick = async () => {
     $('geometry').textContent=`${current.angles} angles × ${data.offsets.length} detectors`;
     $('sino-axis').textContent=`θ → 0° to ${data.angles.at(-1).toFixed(1)}° · s ↓ ${data.offsets[0].toFixed(2)} to ${data.offsets.at(-1).toFixed(2)}`;
     $('sino-scale').textContent=`Display: black = ${minimum.toPrecision(4)}, white = ${peak.toPrecision(4)} line-integral units`;
-    $('step').textContent=data.step.toPrecision(5);
-    $('experiment').textContent=`${current.image.length} × ${current.image.length} grid · ${current.angles} equally spaced angles in [0°, 180°) · noise σ = ${current.noise_std}, seed = ${current.noise_seed}.`;
     document.body.classList.remove('stale');$('status').textContent='Projections ready. Run Landweber to reconstruct this image.';
   } catch(error){$('status').textContent=error.message;} finally {setBusy(false);}
 };
 $('reconstruct').onclick = async () => {
-  if(busy||!projection||projection.version!==version||!$('iterations').reportValidity()) return;
-  setBusy(true);$('status').textContent=`Computing ${$('iterations').value} Landweber iterations…`;
+  if(busy||!projection||projection.version!==version||!$('iterations').reportValidity()||!uqValid()) return;
+  setBusy(true);$('status').textContent=`Computing ${$('iterations').value} Landweber iterations and pixelwise confidence intervals…`;
   try {
-    results=await request('reconstruct',{...projection,iterations:Number($('iterations').value)});
+    results=await request('reconstruct',{...projection,iterations:Number($('iterations').value),...uqSettings()});
+    results.uncertainty.settings=uqSettings();
     $('snapshot').max=results.snapshots.length-1;$('snapshot').value=results.snapshots.length-1;
-    showSnapshot();$('status').textContent=`Reconstruction ready. Inspect ${results.snapshots.length} saved iterates using the slider.`;
+    showSnapshot();$('status').textContent=`Reconstruction ready. Select a pixel to inspect its confidence interval. Inspect ${results.snapshots.length} saved iterates using the slider.`;
   } catch(error){$('status').textContent=error.message;} finally {setBusy(false);}
 };
 function showSnapshot() {
   if(!results) return;
-  const snapshot=results.snapshots[Number($('snapshot').value)], metrics=results.history[snapshot.iteration];
+  const snapshot=results.snapshots[Number($('snapshot').value)];
   render($('reconstruction'),snapshot.image);$('iteration-label').textContent=`k = ${snapshot.iteration}`;
-  $('residual').textContent=metrics.residual.toExponential(4);
-  $('error').textContent=metrics.error===null?'N/A — zero ground truth':`${(100*metrics.error).toFixed(2)}%`;
-  graph(snapshot.iteration);
+  window.dispatchEvent(new CustomEvent('reconstruction-displayed', {detail:snapshot}));
 }
 $('snapshot').oninput=showSnapshot;
-function graph(selected) {
-  const c=$('graph').getContext('2d'), w=760,h=220,p=35, history=results.history, last=history.length-1;
-  c.clearRect(0,0,w,h);c.font='12px system-ui';c.fillStyle='#a3b6c0';c.strokeStyle='#344854';
-  const maximum=Math.max(1,...history.map(v=>v.error??0));
-  for(const value of [0,maximum/2,maximum]) {const y=h-p-value/maximum*(h-2*p);c.beginPath();c.moveTo(p,y);c.lineTo(w-p,y);c.stroke();c.fillText(value.toFixed(1),6,y+4);}
-  const initial=history[0].residual;
-  for(const [key,color] of [['residual','#66d6c5'],['error','#edb569']]) {
-    c.strokeStyle=color;c.beginPath();history.forEach((v,i)=>{if(v[key]===null)return;const value=key==='residual'?(initial?v[key]/initial:0):v[key];const x=p+i/last*(w-2*p),y=h-p-value/maximum*(h-2*p);if(i===0)c.moveTo(x,y);else c.lineTo(x,y);});c.stroke();
-  }
-  c.strokeStyle='#ecf4f9';const x=p+selected/last*(w-2*p);c.beginPath();c.moveTo(x,p);c.lineTo(x,h-p);c.stroke();
-  c.fillText('0',p,h-10);c.fillText(`Iteration ${last}`,w-p-95,h-10);
-}
+$('resample').onclick=async()=>{if(busy)return;$('noise-seed').value=(Number($('noise-seed').value)+1)%4294967296;invalidate();await $('project').onclick();};

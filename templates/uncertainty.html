@@ -1,0 +1,50 @@
+<section id="uq" class="uq-section" aria-labelledby="uq-title">
+  <h2 id="uq-title">Pixelwise confidence intervals</h2>
+  <p id="uq-status" role="status" aria-live="polite">Generate projections, then run Landweber to calculate the intervals.</p>
+  <div class="interval-layout">
+    <div class="pixel-card">
+      <h3>Selected pixel <span id="uq-pixel-label">(0, 0)</span></h3>
+      <p class="hint">Click or hover over the reconstruction, or choose a row and column (zero-based).</p>
+      <label>Row <input id="uq-row" type="number" value="0" min="0" max="15"> Column <input id="uq-col" type="number" value="0" min="0" max="15"></label>
+      <p id="uq-inspector" class="interval-value" aria-live="polite">Awaiting reconstruction.</p>
+      <p id="uq-components" class="hint"></p>
+      <p id="uq-interval-status" class="hint"></p>
+      <p class="hint">Interval = reconstructed value ± (Gaussian noise allowance + bias bound). Coverage is conditional on the source assumption and a noise-independent K. Marginal coverage does not mean simultaneous coverage of every pixel. Endpoints are not clipped to [0, 1].</p>
+    </div>
+    <div class="controls source-controls">
+      <div><h3>Source condition</h3>
+        <label>Bias assumption <select id="uq-mode"><option value="source" selected>Specify M</option><option value="oracle">Calibrate M from drawing</option><option value="variance">No bias assumption</option></select></label>
+        <label>Exponent ν <input id="uq-nu" type="number" value="0.5" min="0.01" max="4" step="any" required></label>
+        <label id="uq-M-field">Proposed M <input id="uq-M" type="number" value="10" min="0.000000000001" max="1000000000000" step="any" required></label>
+        <p class="hint">Assumes x = (AᵀA)<sup>ν</sup>w with ‖w‖ ≤ M. The proposed values are checked using your drawing. Calibration derives M using that known truth; it is not available for an unknown image.</p>
+        <label>K selection <select id="uq-policy"><option value="fixed">Independent of observed noise</option><option value="exploratory">Chosen after inspecting results</option></select></label>
+        <button id="uq-run" disabled>Update intervals & stopping rule</button>
+        <p id="uq-source" class="hint">Source condition has not been checked.</p>
+      </div>
+      <div><h3>Early stopping</h3>
+        <p><strong>B<sub>K</sub> ≤ c₀ v<sub>K</sub></strong></p>
+        <p class="hint">Stop at the first iteration where the bias bound is no larger than c₀ times the largest pixel SD. This is a balancing rule, not a guarantee of minimum reconstruction error.</p>
+        <label>Balance c₀ <input id="uq-c0" type="number" value="1" min="0.01" max="100" step="any" required></label>
+        <label>Search through K <input id="uq-budget" type="number" value="300" min="1" max="1000" required></label>
+        <p id="uq-stop-status">Awaiting reconstruction.</p>
+        <p id="uq-stop-values" class="hint"></p>
+        <button id="uq-use-stop" disabled>Use first stopping iteration</button>
+      </div>
+    </div>
+  </div>
+  <details id="uq-validation">
+    <summary>Monte Carlo validation statistics (optional)</summary>
+    <p class="hint">Checks the mathematics using repeated independent noisy measurements. It does not calculate the displayed confidence intervals or alter the current sinogram.</p>
+    <div class="controls validation-controls">
+      <label>Trials <input id="uq-trials" type="number" value="100" min="20" max="500" required></label>
+      <label>Validation seed <input id="uq-mc-seed" type="number" value="1" min="0" max="4294967295" required></label>
+      <button id="uq-mc" disabled>Run validation</button>
+    </div>
+    <div id="uq-mc-results" hidden>
+      <p id="uq-mc-summary"></p>
+      <table><thead><tr><th>Validation statistic</th><th>Result</th></tr></thead><tbody id="uq-mc-statistics"></tbody></table>
+      <p id="uq-mc-pixel"></p>
+      <p class="hint">Coverage is a fraction of simulated intervals containing the known truth. Average pixel coverage is not joint whole-image coverage. SE describes Monte Carlo sampling error; 100% observed coverage and zero estimated SE do not establish certainty.</p>
+    </div>
+  </details>
+</section>

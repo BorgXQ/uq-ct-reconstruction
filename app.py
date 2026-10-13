@@ -44,7 +44,8 @@ def calculate(action):
         if action == 'project':
             return jsonify(sinogram=y.reshape(count, len(offsets)).T.tolist(),
                            offsets=offsets.tolist(), angles=(angles * 180 / 3.141592653589793).tolist(), step=step)
-        uncertainty = experiment(body)
+        uncertainty = experiment(body, select_stopping=True)
+        iterations = uncertainty['config']['k']
         result = landweber(matrix, y, image.ravel(), iterations, step)
         result['uncertainty'] = uncertainty
         return jsonify(result)

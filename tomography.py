@@ -8,8 +8,8 @@ from scipy.sparse import csr_matrix
 def normalize_image(values):
     """Validate an already area-downsampled density image, without rescaling it."""
     image = np.asarray(values, dtype=np.float64)
-    if image.shape not in ((64, 64), (128, 128), (256, 256)):
-        raise ValueError("Image must be 64 × 64, 128 × 128, or 256 × 256.")
+    if image.shape not in ((16, 16), (24, 24)):
+        raise ValueError("Image must be 16 × 16 or 24 × 24.")
     if not np.isfinite(image).all() or np.any((image < 0) | (image > 1)):
         raise ValueError("Image densities must be finite and between 0 and 1.")
     return image
@@ -23,7 +23,7 @@ def build_operator(n, angle_count):
     A ray is s*(cos(theta),sin(theta)) + t*(-sin(theta),cos(theta)).
     Rows are angle-major; columns are row-major image pixels.
     """
-    if n not in (64, 128, 256) or not 1 <= angle_count <= 180:
+    if n not in (16, 24, 64, 128, 256) or not 1 <= angle_count <= 180:
         raise ValueError("Unsupported geometry.")
     angles = np.arange(angle_count) * np.pi / angle_count
     spacing = 2.0 / n

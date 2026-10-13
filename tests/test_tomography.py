@@ -32,9 +32,9 @@ class NumericalTests(unittest.TestCase):
         np.testing.assert_allclose(sino[1], expected, atol=1e-12)
 
     def test_density_preserved(self):
-        image = normalize_image(np.full((64, 64), 127 / 255))
+        image = normalize_image(np.full((16, 16), 127 / 255))
         self.assertEqual(image[0, 0], 127 / 255)
-        for invalid in [np.zeros((12, 12)), np.full((64, 64), np.nan), np.full((64, 64), 1.1)]:
+        for invalid in [np.zeros((12, 12)), np.full((16, 16), np.nan), np.full((16, 16), 1.1)]:
             with self.assertRaises(ValueError):
                 normalize_image(invalid)
 
@@ -73,7 +73,7 @@ class NumericalTests(unittest.TestCase):
         self.assertGreater(blank.max(), 0)
 
     def test_larger_grid_snapshot_budget(self):
-        for n, expected in [(128, 64), (256, 16)]:
+        for n, expected in [(16, 101), (24, 101)]:
             truth = normalize_image(np.full((n,n), .4))
             a, y, _, _, step = project(truth, 2)
             result = landweber(a, y, truth.ravel(), 100, step)
@@ -92,7 +92,7 @@ class NumericalTests(unittest.TestCase):
 class ApiTests(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
-        self.body = {'image':np.full((64, 64), .4).tolist(), 'angles':12, 'iterations':4}
+        self.body = {'image':np.full((16, 16), .4).tolist(), 'angles':12, 'iterations':4}
 
     def test_page_and_workflow(self):
         self.assertEqual(self.client.get('/').status_code, 200)
@@ -110,12 +110,20 @@ class ApiTests(unittest.TestCase):
         result = self.client.post('/api/reconstruct', json=body).json
         self.assertAlmostEqual(result['history'][0]['residual'], np.linalg.norm(projected['sinogram']))
 
-    def test_large_request_and_removed_grid(self):
-        # Long decimals exceed the previous 512 KiB request limit.
-        body = self.body | {'image':np.full((256,256), 127/255).tolist(), 'angles':2, 'iterations':1}
-        for action in ['project', 'reconstruct']:
-            response = self.client.post('/api/' + action, json=body)
-            self.assertEqual(response.status_code, 200)
+    def test_shared_resolution_and_noise(self):
+        for n in (16,24):
+            for step_mode in ('paper','phase1'):
+                body=self.body | {'image':np.full((n,n),127/255).tolist(), 'noise_std':.02, 'step_mode':step_mode}
+                projected=self.client.post('/api/project',json=body).json
+                reconstructed=self.client.post('/api/reconstruct',json=body).json
+                uncertainty=reconstructed['uncertainty']
+                np.testing.assert_array_equal(projected['sinogram'],uncertainty['measurements']['observed'])
+                np.testing.assert_allclose(reconstructed['snapshots'][-1]['image'],uncertainty['maps']['reconstruction'],atol=1e-14)
+                self.assertEqual(projected['step'],uncertainty['omega'])
+                self.assertEqual(reconstructed['step'],uncertainty['omega'])
+                self.assertEqual(uncertainty['config']['n'],n)
+        for n in (32,64,128,256):
+            self.assertEqual(self.client.post('/api/project',json=self.body|{'image':np.zeros((n,n)).tolist()}).status_code,400)
 
     def test_bad_inputs(self):
         for change in [{'noise_std':-1}, {'noise_std':1.1}, {'noise_std':True}, {'noise_std':'0.1'}, {'noise_std':float('nan')}, {'noise_seed':-1}, {'noise_seed':1.5}, {'noise_seed':True}, {'image':np.zeros((32,32)).tolist()}, {'angles':0}, {'angles':181}, {'angles':2.5}, {'angles':True}, {'iterations':1001}, {'image':[]}]:

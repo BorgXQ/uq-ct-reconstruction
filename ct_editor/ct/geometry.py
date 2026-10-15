@@ -154,6 +154,13 @@ class Operator:
     def forward(self,x): return self._matrix @ self._vector(x,self.shape[1])
     def adjoint(self,z): return self._matrix.T @ self._vector(z,self.shape[0])
     def normal(self,x): return self.adjoint(self.forward(x))
+    def _block(self, value, size):
+        value=np.asarray(value,dtype=np.float64)
+        if value.ndim!=2 or value.shape[0]!=size or not 1<=value.shape[1]<=64 or not np.isfinite(value).all():
+            raise InputError('Expected a finite compatible block of at most 64 columns.',code='incompatible_dimensions')
+        return value
+    def forward_block(self,x): return self._matrix @ self._block(x,self.shape[1])
+    def adjoint_block(self,x): return self._matrix.T @ self._block(x,self.shape[0])
 
 
 def build_operator(geometry, check=lambda:None, progress=lambda *args:None):

@@ -26,7 +26,7 @@ async function clear(){await page.click('#clear');await draft();}
 const check=message=>console.log('PASS '+message);
 try {
   await page.goto(base);await wait();
-  assert.equal(await page.locator('nav button:disabled').count(),3);
+  assert.equal(await page.getByRole('button', {name:/Uncertainty & Validation/}).isDisabled(),true);
   assert.equal((await metadata()).statistics.maximum,0);
   assert.equal(await page.locator('#resolution').inputValue(),'32');
   check('local shell, actual blank draft, defaults, disabled future workspaces');

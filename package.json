@@ -2,6 +2,10 @@
   "name": "ct-reconstruction-editor",
   "private": true,
   "type": "module",
-  "scripts": {"test": "node tests/editor.test.mjs", "test:browser": "node scripts/check-browser.mjs"},
+  "scripts": {
+    "test": "node tests/editor.test.mjs && node tests/ct-view.test.mjs",
+    "test:browser": "node scripts/check-browser.mjs",
+    "test:browser:m2": "node scripts/check-m2-browser.mjs"
+  },
   "devDependencies": {"playwright": "1.63.0"}
 }

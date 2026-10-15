@@ -26,10 +26,10 @@ async function clear(){await page.click('#clear');await draft();}
 const check=message=>console.log('PASS '+message);
 try {
   await page.goto(base);await wait();
-  assert.equal(await page.getByRole('button', {name:/Uncertainty & Validation/}).isDisabled(),true);
+  assert.equal(await page.locator('#nav-uq').count(),1);
   assert.equal((await metadata()).statistics.maximum,0);
   assert.equal(await page.locator('#resolution').inputValue(),'32');
-  check('local shell, actual blank draft, defaults, disabled future workspaces');
+  check('local shell, actual blank draft, defaults and integrated workflow navigation');
 
   await shade(128);await gesture(100,100);await draft();
   assert.deepEqual(await pixel(100,100),[128,128,128,255]);

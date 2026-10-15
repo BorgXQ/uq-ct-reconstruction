@@ -21,7 +21,8 @@ function fillOptions(id,records,key,label){
   if(records.some(item=>item[key]===previous))select.value=previous;
 }
 function availability(){
-  $('nav-measure').disabled=!snapshots.length;$('nav-reconstruct').disabled=!observations.length;
+  $('nav-measure').disabled=!snapshots.length;$('nav-reconstruct').disabled=!observations.length;$('nav-uq').disabled=!observations.length;
+  $('uq-nav-state').textContent=observations.length?'ready':'not_ready';
   $('generate-scan').disabled=!$('measure-snapshot').value;
   $('run-reconstruction').disabled=!$('reconstruct-observation').value;
   $('new-observation').disabled=$('new-noise').disabled=!scan;
@@ -62,9 +63,9 @@ async function refresh(){
   for(const id of ['measure-observation','reconstruct-observation'])fillOptions(id,observations,'observation_id',o=>`${o.observation_id.slice(0,8)} · σ ${o.noise.sigma} · seed ${o.noise.seed}`);
   fillOptions('reconstructions',runs,'reconstruction_id',r=>`${r.reconstruction_id.slice(0,8)} · ${r.status} · K ${r.completed_iterations}/${r.requested_iterations}`);
   if(oldSource&&!$('measure-snapshot').value)selectSource('');
-  availability();
+  availability();window.dispatchEvent(new CustomEvent('ct-records',{detail:{observations,runs}}));
 }
-function stage(name,status){const prefix=name==='reconstruction'?'reconstruct':'measure';$(prefix+'-state').textContent=$(prefix+'-nav-state').textContent=status;}
+function stage(name,status){const prefix=name.startsWith('exact_')?'uq':name==='reconstruction'?'reconstruct':'measure';$(prefix+'-state').textContent=$(prefix+'-nav-state').textContent=status;}
 async function watch(job,done){
   const id=job.job_id;
   if(polled.has(id))return;polled.add(id);
@@ -108,6 +109,7 @@ async function showObservation(id,{adoptForm=false}={}){
   }catch(e){if(serial===observationSerial){scan=null;$('scan-results').hidden=true;$('measure-status').textContent='Observation unavailable. Refresh records or generate a new scan.';availability();message(e.message);}}
 }
 function renderScan(){
+  window.dispatchEvent(new CustomEvent('ct-observation-selected',{detail:scan.observation.observation_id}));
   const {acquisition:a,observation:o,truth}=scan,na=a.shape[0],nd=a.shape[1],range=sharedRange(a.y_clean,o.y);
   $('scan-results').hidden=false;paintRaster($('scan-truth'),Uint8Array.from(truth.pixels,x=>Math.round(255*x)),truth.resolution);
   drawSinogram($('clean-sinogram'),a.y_clean,na,nd,range);drawSinogram($('observed-sinogram'),o.y,na,nd,range);
@@ -158,7 +160,7 @@ async function showRun(id){
   }catch(e){if(serial===runSerial){run=null;$('reconstruction-results').hidden=true;$('reconstruct-status').textContent='Reconstruction unavailable. Refresh records.';message(e.message);}}
 }
 function drawIteration(cp){
-  iteration=cp;
+  iteration=cp;window.dispatchEvent(new CustomEvent('ct-inspected',{detail:{reconstruction_id:run.reconstruction_id,iteration:cp.iteration}}));
   const n=run.resolution;
   paintRaster($('reconstruction-image'),Uint8Array.from(cp.pixels,x=>Math.round(255*Math.min(1,Math.max(0,x)))),n);
   let min=Infinity,max=-Infinity;for(const x of cp.pixels){min=Math.min(min,x);max=Math.max(max,x);}
@@ -211,7 +213,7 @@ function pixelInspect(){
 function safe(handler){return async e=>{try{await handler(e);}catch(error){message(error.message);}};}
 document.querySelectorAll('[data-workspace]').forEach(button=>button.onclick=()=>{
   if(document.querySelector('#paint-controls').disabled)return;
-  for(const name of ['draw','measure','reconstruct'])$(name+'-workspace').hidden=name!==button.dataset.workspace;
+  for(const name of ['draw','measure','reconstruct','uq'])$(name+'-workspace').hidden=name!==button.dataset.workspace;
   document.querySelectorAll('[data-workspace]').forEach(b=>{if(b===button)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');});
 });
 window.addEventListener('ct-draft',e=>{draftState=e.detail;scanMismatch();});
@@ -270,3 +272,5 @@ for(const id of ['truth-marker','reconstruction-marker'])$(id).onclick=safe(e=>{
 refresh().then(async()=>{
   const jobs=await get('/api/jobs');for(const job of jobs.jobs)if(['running','queued'].includes(job.status))watch(job).catch(()=>{});
 }).catch(e=>message(e.message));
+
+export {api,get,watch,refresh};

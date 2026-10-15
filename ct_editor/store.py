@@ -10,8 +10,10 @@ from .images import InputError, serialize
 
 
 class SnapshotStore:
-    def __init__(self, max_count=50, max_bytes=64 * 1024**2):
+    def __init__(self, max_count=50, max_bytes=64 * 1024**2, budget=None):
         self.max_count, self.max_bytes = max_count, max_bytes
+        self._budget = budget
+        self._leases = []
         self._records = {}
         self._size = 0
         self._lock = Lock()
@@ -27,6 +29,8 @@ class SnapshotStore:
         with self._lock:
             if len(self._records) >= self.max_count or self._size + size > self.max_bytes:
                 raise InputError("Snapshot storage is full. Existing snapshots are preserved; restart the server to clear the store.", code="storage_limit", status=507)
+            if self._budget:
+                self._leases.append(self._budget.reserve(size))
             self._records[record["snapshot_id"]] = (encoded, payload, source)
             self._size += size
         return self.get(record["snapshot_id"])

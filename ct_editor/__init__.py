@@ -1,4 +1,4 @@
-"""Local M1 app factory."""
+"""Local drawing, measurement and reconstruction app factory."""
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
@@ -6,6 +6,9 @@ from werkzeug.exceptions import HTTPException
 
 from .images import InputError, parse_request, convert, serialize
 from .store import SnapshotStore
+from .ct.jobs import MemoryBudget
+from .ct.service import CTService
+from .ct.routes import routes
 
 
 def create_app(config=None):
@@ -14,8 +17,12 @@ def create_app(config=None):
     app.config.update(MAX_CONTENT_LENGTH=1024**2, SNAPSHOT_LIMIT=50, SNAPSHOT_BYTE_LIMIT=64 * 1024**2)
     if config:
         app.config.update(config)
-    store = SnapshotStore(app.config["SNAPSHOT_LIMIT"], app.config["SNAPSHOT_BYTE_LIMIT"])
+    budget = MemoryBudget(app.config.get('CT_MEMORY_BYTES', 512 * 1024**2))
+    store = SnapshotStore(app.config["SNAPSHOT_LIMIT"], app.config["SNAPSHOT_BYTE_LIMIT"], budget)
     app.extensions["snapshot_store"] = store
+    service = CTService(store, budget, app.config)
+    app.extensions['ct_service'] = service
+    app.register_blueprint(routes(service))
 
     @app.get("/")
     def index():
@@ -23,7 +30,7 @@ def create_app(config=None):
 
     @app.get("/api/health")
     def health():
-        return jsonify(status="ready", milestone="M1")
+        return jsonify(status="ready", milestone="M2")
 
     def capture():
         if not request.is_json:

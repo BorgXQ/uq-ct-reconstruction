@@ -86,6 +86,7 @@ function render() {
     const {pixels, ...metadata} = data; $('metadata').textContent = JSON.stringify(metadata, null, 2);
   }
   inspect(); overlay();
+  window.dispatchEvent(new CustomEvent('ct-draft', {detail: {ready: previewState === 'ready' && draftGeneration === generation, source_hash: draft?.source_hash, content_hash: draft?.content_hash}}));
 }
 function overlay() {
   const canvas = $('overlay'), ctx = canvas.getContext('2d'), data = current(); ctx.clearRect(0, 0, 512, 512);
@@ -125,6 +126,7 @@ async function refreshSnapshots(keepId = frozen?.snapshot_id) {
   }
   if (keepId && result.snapshots.some(item => item.snapshot_id === keepId)) $('snapshots').value = keepId;
   else if (keepId) { frozenUnavailable = true; render(); }
+  window.dispatchEvent(new CustomEvent('ct-snapshots', {detail: {records: result.snapshots, selectedId: keepId}}));
 }
 async function selectSnapshot(id) {
   const serial = ++selectionSerial;
@@ -133,6 +135,7 @@ async function selectSnapshot(id) {
     const result = await api(`/api/snapshots/${encodeURIComponent(id)}`);
     if (serial !== selectionSerial) return;
     frozen = result; frozenUnavailable = false; mode = 'frozen'; selected = null; report(''); render();
+    window.dispatchEvent(new CustomEvent('ct-snapshot-selected', {detail: result.snapshot_id}));
   } catch (error) { if(serial === selectionSerial) { frozenUnavailable = true; mode='frozen'; report(error.message); render(); } }
 }
 $('freeze').onclick = async () => {

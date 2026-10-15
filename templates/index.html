@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Can We Trust This CT Reconstruction?</title><link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header><div class="eyebrow">COMPUTATIONAL IMAGING / LOCAL LAB</div><h1>Can We Trust This CT Reconstruction?</h1><p>Start with an object you know. Draw it, inspect its numerical grid, then freeze the ground truth.</p></header>
+<nav aria-label="Experiment workflow"><button aria-current="step">01 <strong>Draw</strong></button><button disabled title="Measurement arrives in Milestone 2">02 Measure <small>M2</small></button><button disabled title="Reconstruction arrives in Milestone 2">03 Reconstruct <small>M2</small></button><button disabled title="Uncertainty and validation arrive in Milestones 3–5">04 Uncertainty &amp; Validation <small>M3–5</small></button></nav>
+<main>
+<div class="workspace">
+<section class="panel"><div class="panel-title"><div><span class="eyebrow">EDITABLE SOURCE</span><h2>Draw your object</h2></div><span class="tag">512 × 512</span></div>
+<fieldset id="paint-controls"><legend>Drawing tools</legend>
+<div class="tools" role="group" aria-label="Drawing tool"><button data-tool="brush" aria-pressed="true">Brush</button><button data-tool="eraser" aria-pressed="false">Eraser</button><button data-tool="circle" aria-pressed="false">Circle</button><button data-tool="square" aria-pressed="false">Square</button><button data-tool="bucket" aria-pressed="false">Paint bucket</button></div>
+<div class="settings"><label>Shade <span id="swatch" aria-hidden="true"></span><input id="shade" type="number" min="0" max="255" value="255"></label><label class="slider-label">Shade slider<input aria-label="Shade slider" id="shade-slider" type="range" min="0" max="255" value="255"></label><output id="shade-value">255 / 255 = 1</output></div>
+<div class="palette" aria-label="Quick grayscale palette"><button data-shade="0" style="--shade:0">0</button><button data-shade="64" style="--shade:64">64</button><button data-shade="128" style="--shade:128">128</button><button data-shade="192" style="--shade:192">192</button><button data-shade="255" style="--shade:255">255</button></div>
+<div class="settings"><label>Thickness <input id="thickness" type="number" min="1" max="128" value="16"><small>source pixels</small></label><label>Shape mode<select id="shape-mode"><option value="filled">Filled</option><option value="outline">Outline</option></select></label><label>Fill tolerance<input id="tolerance" type="number" min="0" max="255" value="0"></label></div>
+</fieldset>
+<p id="tool-hint" class="hint">Drag to paint. Click for a round dab. Escape cancels a gesture.</p>
+<canvas id="editor" width="512" height="512" tabindex="0" aria-label="Editable grayscale drawing, 512 by 512"></canvas>
+<div class="actions"><button id="undo" disabled>Undo</button><button id="redo" disabled>Redo</button><button id="clear">Clear</button><span id="revision" class="muted">Revision 0</span></div>
+</section>
+<section class="panel"><div class="panel-title"><div><span class="eyebrow">NUMERICAL IMAGE</span><h2>Inspect the actual values</h2></div><span id="dimensions" class="tag">32 × 32</span></div>
+<div class="settings numerical-controls"><label>Numerical resolution<select id="resolution"><option value="16">16 × 16</option><option value="32" selected>32 × 32</option><option value="64">64 × 64</option></select></label><button class="primary" id="freeze">Freeze image</button></div>
+<p id="freeze-status" role="status" class="hint">Freeze stores a separate, immutable numerical image.</p>
+<div class="tabs" role="group" aria-label="Numerical image source"><button id="draft-tab" aria-pressed="true">Current draft</button><button id="frozen-tab" aria-pressed="false">Frozen snapshot</button></div>
+<div class="settings"><label class="grow">Snapshot<select id="snapshots"><option value="">No snapshot selected</option></select></label><button id="refresh-snapshots">Refresh list</button><label class="check"><input type="checkbox" id="grid">Grid</label></div>
+<p id="preview-status" role="status" class="hint">Computing blank draft…</p>
+<div class="numerical-wrap"><canvas id="numerical" width="32" height="32" aria-label="Numerical pixel image"></canvas><canvas id="overlay" width="512" height="512" tabindex="0" aria-label="Select a numerical pixel"></canvas><div id="empty-numerical">Loading numerical image…</div></div>
+<div class="scale"><span>0 · black</span><div></div><span>1 · white</span></div>
+<p class="hint">Display shades are rounded to 8 bits. Inspection uses the stored float64 values.</p>
+<div id="statistics" class="statistics">No numerical values yet.</div>
+<div id="errors" role="alert" hidden></div><button id="retry" hidden>Retry preview</button>
+<details><summary>Image metadata &amp; provenance</summary><pre id="metadata">No image selected.</pre></details>
+</section>
+</div>
+<section class="panel inspector"><div><span class="eyebrow">PIXEL INSPECTOR</span><h2>Inspect a pixel</h2></div><div class="settings"><label>Row<input id="row" type="number" min="0" max="31" placeholder="0"></label><label>Column<input id="column" type="number" min="0" max="31" placeholder="0"></label><button id="inspect">Inspect pixel</button></div><div id="pixel-info" aria-live="polite">Select a numerical cell or enter its row and column. Zero is a valid density.</div></section>
+<details class="panel explanation"><summary>How does the drawing become ground truth?</summary><p>The editor is a high-resolution drawing. The backend averages it onto the selected grid and normalizes the values to 0–1. The frozen numerical grid is the ground truth for later simulated CT measurements. It is stored separately, so further drawing does not change an existing experiment’s image.</p><p>Rows increase downward; columns increase rightward. Spatial coordinates cover [−1, 1] in both directions, with vertical coordinates increasing upward. All-black images are valid. These densities are simulation quantities, not calibrated medical measurements.</p><p>Snapshots survive a page reload while this server is running, but are lost on server restart. The store holds up to <span id="capacity">50</span> snapshots. The drawing and undo history are not saved on reload.</p><p>Measure and Reconstruct arrive in M2. Uncertainty and Validation arrive in M3–M5.</p></details>
+</main><footer>MILESTONE 001 · GRAYSCALE EDITOR &amp; NUMERICAL GROUND TRUTH</footer><script type="module" src="/static/app.js"></script>
+</body></html>

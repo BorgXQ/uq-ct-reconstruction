@@ -72,7 +72,7 @@ async function show(aid,signature=null){
     const [a,h]=await Promise.all([get('/api/exact-analyses/'+aid),get(`/api/exact-analyses/${aid}/stopping-history`)]);
     const t=await get('/api/snapshots/'+a.snapshot_id);
     if(serial!==selectionSerial)return;
-    base=a;view=a;truth=t;history=h.history;acceptedForm=signature;$('uq-analyses').value=aid;$('uq-results').hidden=false;
+    base=a;view=a;truth=t;history=h.history;window.dispatchEvent(new CustomEvent('exact-selected',{detail:{analysis_id:aid}}));acceptedForm=signature;$('uq-analyses').value=aid;$('uq-results').hidden=false;
     $('uq-status').textContent=`Captured analysis ${aid} · ${a.status}`;
     $('uq-result-title').textContent=`Full-spectrum baseline · ${a.status}`;
     $('uq-summary').textContent=`Analysis ${aid} · observation ${a.observation_id} · frozen source ${a.snapshot_id} · analysis selected K ${a.selected_k??'none'} · σ ${a.configuration.sigma} · ω ${fmt(a.step.omega)} (${a.step.step_policy}) · ${a.elapsed_seconds.toFixed(3)} s.`;
@@ -114,7 +114,7 @@ function draw(key,name=key){
 }
 function render(){
   if(!view)return;
-  $('uq-maps').hidden=!view.center;
+  $('uq-maps').hidden=!view.center;$('compare-exact').disabled=base.status!=='completed';$('compare-exact').textContent=`Compare approximations at selected K ${base.selected_k??'unavailable'}`;
   $('uq-interpretation').textContent=`${view.coverage_interpretation||view.status}. ${(view.unmet_conditions||[]).join(' ')} Marginal pixelwise formula; not simultaneous whole-image coverage.`;
   $('uq-inspection-status').textContent=`Analysis selected K: ${base.selected_k??'none'} · Inspecting k: ${view.iteration??'none'} · ${view.selection_status||'no selection'}`;
   $('uq-inspection-status').dataset.iteration=view.iteration??'';
@@ -183,3 +183,5 @@ for(const name of ['truth','center','total_half_width','absolute_error','extra']
   $('uq-col').value=Math.min(n-1,Math.max(0,Math.floor((e.clientX-r.left)*n/r.width)));pixel();
 });
 controls();lists().catch(error);
+
+$('compare-exact').onclick=()=>{if(base?.status==='completed')window.dispatchEvent(new CustomEvent('compare-exact',{detail:{analysis_id:base.analysis_id}}));};

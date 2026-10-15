@@ -41,7 +41,7 @@
   </section>
   <section id="uq-results" hidden>
     <section class="panel">
-      <h3 id="uq-result-title">Analysis</h3><p id="uq-summary"></p><p id="uq-interpretation" class="uq-notice"></p>
+      <h3 id="uq-result-title">Analysis</h3><button id="compare-exact">Compare approximations at this K</button><p id="uq-summary"></p><p id="uq-interpretation" class="uq-notice"></p>
       <p id="uq-mismatch" class="hint"></p>
       <button id="uq-cap" hidden>Run explicitly at the unmet search budget (exploratory)</button>
       <div id="uq-inspection-controls" class="settings">
@@ -75,4 +75,5 @@
     <p>GFI considers Qᵧᴷ(U) = Tₖ(y − σU), with observed y fixed and auxiliary Gaussian U. Its covariance matches Γₖ, but repeated-measurement sampling varies Y and has mean TₖAx†. No sampler, extra measurement noise or Bayesian posterior is computed here.</p>
     <p>Full-spectrum UQ supports 16×16 and 32×32 under resource limits. 64×64 remains available for M2 reconstruction. Joint inverse-covariance regions are not implemented; eligibility reasons are reported. Randomized methods and repeated coverage experiments belong to later milestones.</p>
   </details>
+{% include "randomized.html" %}
 </section>

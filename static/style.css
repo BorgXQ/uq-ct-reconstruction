@@ -6,3 +6,14 @@
 .uq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.uq-grid .panel{min-width:0;margin:0}.uq-grid{margin:14px 0}.uq-map-card .numerical-wrap{width:100%}.uq-extra-map{max-width:420px;margin:16px auto}.uq-check{display:flex;align-items:center;gap:9px;margin:14px 0}.uq-check input{width:auto;min-height:0}.uq-notice{padding:12px;border-left:3px solid #be7026;background:#faf2e4}#uq-form>label{display:block;margin:12px 0}#uq-form>label input:not([type=checkbox]){width:100%}#uq-pixel-info,#uq-diagnostic-info,#uq-details,#uq-assumptions{white-space:pre-wrap;overflow-wrap:anywhere}#uq-stopping-chart{width:100%;max-height:300px}#uq-workspace .settings>label{min-width:150px}#uq-workspace .hint{overflow-wrap:anywhere}@media(max-width:700px){.uq-grid{grid-template-columns:1fr}#uq-workspace .settings>label{min-width:0;flex-basis:100%}}
 #uq-workspace .numerical-wrap canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}#uq-workspace .numerical-wrap canvas[id^="uq-marker-"]{z-index:2;cursor:crosshair}
 .uq-scale{display:flex;align-items:center;gap:8px;font-size:11px;margin:10px 0;font-variant-numeric:tabular-nums}.uq-scale>div{flex:1;height:10px;border:1px solid #9ba99e;min-width:30px}
+
+/* M4 comparison maps keep real grid pixels and one synchronized inspector. */
+.rq-card { min-width: 0; }
+.rq-image { position: relative; width: 100%; aspect-ratio: 1; background: #101713; }
+.rq-image canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.rq-marker { cursor: crosshair; }
+.rq-extra { max-width: 520px; margin: 1rem auto; }
+#rq-results pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 32rem; overflow: auto; }
+#rq-results svg { width: 100%; max-height: 300px; }
+#rq-error { color: #a63226; overflow-wrap: anywhere; }
+#rq-summary, #rq-context { overflow-wrap: anywhere; }

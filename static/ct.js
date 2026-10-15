@@ -65,7 +65,7 @@ async function refresh(){
   if(oldSource&&!$('measure-snapshot').value)selectSource('');
   availability();window.dispatchEvent(new CustomEvent('ct-records',{detail:{observations,runs}}));
 }
-function stage(name,status){const prefix=name.startsWith('exact_')?'uq':name==='reconstruction'?'reconstruct':'measure';$(prefix+'-state').textContent=$(prefix+'-nav-state').textContent=status;}
+function stage(name,status){const prefix=(name.startsWith('exact_')||name.startsWith('randomized_'))?'uq':name==='reconstruction'?'reconstruct':'measure';$(prefix+'-state').textContent=$(prefix+'-nav-state').textContent=status;}
 async function watch(job,done){
   const id=job.job_id;
   if(polled.has(id))return;polled.add(id);

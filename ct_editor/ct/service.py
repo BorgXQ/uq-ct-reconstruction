@@ -186,13 +186,7 @@ class CTService:
                 diagnostics.record(k,x)
                 if k%5==0 or k==K: job.progress('Reconstructing',k,K)
             result=landweber(op,inference['y'],step['omega'],K,job.event.is_set,emit)
-            meta=dict(reconstruction_id=recid,configuration_hash=config_hash,configuration=config,observation_id=oid,operator_id=spec.geometry_hash,
-                acquisition_id=om['acquisition_id'],snapshot_id=am['snapshot_id'],resolution=spec.resolution,shape=[spec.resolution]*2,flatten_order='C',dtype='float64',created_at=now(),
-                history=result['history'],diagnostics=dict(label='Validation only — synthetic ground truth known',snapshot_id=am['snapshot_id'],history=diagnostics.history),
-                checkpoint_indices=list(result['checkpoints']),operator_cache_hit=hit,
-                warnings=[] if step['nonoscillatory_certified'] else ['Stable under conservative bound; nonoscillatory condition is not certified.'],
-                **{k:result[k] for k in ('completed_iterations','requested_iterations','status','stop_reason','elapsed_seconds','checkpoint_stride','forward_applications','adjoint_applications')})
-            record=Record.make(meta,**{f'checkpoint_{k}':v for k,v in result['checkpoints'].items()})
+            record=self.reconstruction_record(recid,config,am,result,diagnostics.history,hit)
             def publish():
                 self._publish([('reconstructions',recid,record)])
                 return dict(reconstruction_id=recid,completed_iterations=result['completed_iterations'])
@@ -205,6 +199,20 @@ class CTService:
         m,n=spec.shape
         workspace=spec.estimate_bytes()+n*8*110+(K+1)*1400+(m+n)*96+32768
         return self._submit('reconstruction',rid,dict(configuration_hash=config_hash,**config),['reconstructions'],workspace,work)
+    def reconstruction_record(self,recid,config,acquisition,result,diagnostic_history,cache_hit):
+        """Shared immutable M2 run format, also used by new exact plans."""
+        meta=dict(reconstruction_id=recid,configuration_hash=digest(config),configuration=config,
+            observation_id=config['observation_id'],operator_id=config['operator_id'],
+            acquisition_id=acquisition['acquisition_id'],snapshot_id=acquisition['snapshot_id'],
+            resolution=acquisition['resolution'],shape=[acquisition['resolution']]*2,flatten_order='C',dtype='float64',created_at=now(),
+            history=result['history'],diagnostics=dict(label='Validation only — synthetic ground truth known',
+                snapshot_id=acquisition['snapshot_id'],history=diagnostic_history),
+            checkpoint_indices=list(result['checkpoints']),operator_cache_hit=cache_hit,
+            warnings=[] if config['nonoscillatory_certified'] else ['Stable step; nonoscillatory condition not certified.'],
+            **{k:result[k] for k in ('completed_iterations','requested_iterations','status','stop_reason','elapsed_seconds',
+                'checkpoint_stride','forward_applications','adjoint_applications')})
+        return Record.make(meta,**{f'checkpoint_{k}':v for k,v in result['checkpoints'].items()})
+
     def result(self,recid):
         record=self._get('reconstructions',recid);meta=record.meta();meta.pop('history');meta.pop('diagnostics')
         return {**meta,'pixels':record.array(f"checkpoint_{meta['completed_iterations']}").tolist()}

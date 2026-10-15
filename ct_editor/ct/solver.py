@@ -1,5 +1,6 @@
 """Pure full-operator Landweber. No truth, simulator or RNG dependency."""
 import math
+from dataclasses import dataclass
 from time import perf_counter
 import numpy as np
 from ..images import InputError
@@ -26,11 +27,34 @@ def resolve_step(operator, settings):
     return dict(omega=omega,step_policy=policy,L_safe=L,stable_certified=True,nonoscillatory_certified=omega<=1/L)
 
 
-def landweber(operator, y, omega, iterations, cancel=lambda:False, emit=lambda *args:None):
+@dataclass(frozen=True)
+class SpectralCertificate:
+    """Backend-only result of a checked full decomposition; never client input."""
+    operator_id: str
+    csr_checksum: str
+    lambda_max: float
+    spectrum_id: str
+
+
+def validate_step(operator, omega, certificate=None):
+    if certificate is None:
+        return resolve_step(operator, {'mode':'manual','value':omega})
+    meta=operator.metadata()
+    if (not isinstance(certificate,SpectralCertificate) or
+            certificate.operator_id!=meta['operator_id'] or certificate.csr_checksum!=meta['csr_checksum']):
+        raise InputError('Spectral step certificate belongs to a different operator.',code='incompatible_reconstruction',status=422)
+    maximum=certificate.lambda_max
+    if not math.isfinite(maximum) or maximum<=0 or maximum>meta['L_safe']*(1+1e-10):
+        raise InputError('Invalid spectral certificate.',code='invalid_step',status=422)
+    if not math.isfinite(omega) or omega<=0 or omega*maximum>=2*(1-1e-12):
+        raise InputError('Step is unstable or too close to the numerical stability boundary.',code='invalid_step',status=422)
+
+
+def landweber(operator, y, omega, iterations, cancel=lambda:False, emit=lambda *args:None, *, step_certificate=None):
     integer(iterations,'iterations',1,5000)
     y=frozen_array(y)
     if y.shape!=(operator.shape[0],): raise InputError('Observation shape mismatch.',code='incompatible_dimensions')
-    resolve_step(operator,{'mode':'manual','value':omega})
+    validate_step(operator,omega,step_certificate)
     x=np.zeros(operator.shape[1],np.float64);residual=y.copy();ynorm=float(np.linalg.norm(y));start=perf_counter()
     stride=max(1,math.ceil(iterations/100));checkpoints={};history=[];k=0
     def record():

@@ -9,6 +9,8 @@ from .store import SnapshotStore
 from .ct.jobs import MemoryBudget
 from .ct.service import CTService
 from .ct.routes import routes
+from .exact.service import ExactService
+from .exact.routes import routes as exact_routes
 
 
 def create_app(config=None):
@@ -23,6 +25,9 @@ def create_app(config=None):
     service = CTService(store, budget, app.config)
     app.extensions['ct_service'] = service
     app.register_blueprint(routes(service))
+    exact = ExactService(service, app.config)
+    app.extensions['exact_service'] = exact
+    app.register_blueprint(exact_routes(exact))
 
     @app.get("/")
     def index():
@@ -30,7 +35,7 @@ def create_app(config=None):
 
     @app.get("/api/health")
     def health():
-        return jsonify(status="ready", milestone="M2")
+        return jsonify(status="ready", milestone="M3")
 
     def capture():
         if not request.is_json:

@@ -11,6 +11,8 @@ from .ct.service import CTService
 from .ct.routes import routes
 from .exact.service import ExactService
 from .exact.routes import routes as exact_routes
+from .randomized.service import RandomizedService
+from .randomized.routes import routes as randomized_routes
 
 
 def create_app(config=None):
@@ -28,6 +30,9 @@ def create_app(config=None):
     exact = ExactService(service, app.config)
     app.extensions['exact_service'] = exact
     app.register_blueprint(exact_routes(exact))
+    randomized = RandomizedService(exact, app.config)
+    app.extensions['randomized_service'] = randomized
+    app.register_blueprint(randomized_routes(randomized))
 
     @app.get("/")
     def index():
@@ -35,7 +40,7 @@ def create_app(config=None):
 
     @app.get("/api/health")
     def health():
-        return jsonify(status="ready", milestone="M3")
+        return jsonify(status="ready", milestone="M4")
 
     def capture():
         if not request.is_json:

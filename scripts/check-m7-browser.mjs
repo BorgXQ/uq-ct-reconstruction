@@ -24,12 +24,12 @@ try{
  await page.locator('#rq-approx-options > summary').click();await page.fill('#rq-rank','4');await page.fill('#rq-p','4');await page.fill('#rq-count','4');
  const a=await reconstruct();assert.equal(a.iteration,5);
  await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'),{},{timeout:120000});
- assert.equal(await page.locator('#coverage-image').isVisible(),true);assert.match(await page.locator('#coverage-title').textContent(),/3\/3 trials/);
+ assert.equal(await page.locator('#coverage-image').isVisible(),true);assert.match(await page.locator('#coverage-title').textContent(),/, 3 trials\)/);
  const studies=(await get('/api/validation-studies')).studies;const entry=studies.find(s=>s.plan.template_id===a.analysis_id);assert.ok(entry);
  const study=await get('/api/validation-studies/'+entry.study_id+'?arrays=1');
  assert.equal(study.plan.iterations,a.iteration);assert.equal(study.plan.trials,3);assert.equal(study.plan.protocol,'fixed_algorithm');assert.equal(study.plan.comparison,'common_k');assert.deepEqual(study.plan.methods,['corrected']);
  assert.equal(study.configuration.rank,a.configuration.rank);assert.deepEqual(study.configuration.source,a.configuration.source);
- const values=study.maps.corrected.coverage.filter((v,i)=>{const x=2*(i%16+.5)/16-1,y=1-2*(Math.floor(i/16)+.5)/16;return (x/.9)**2+(y/.9)**2<=1;});
+ const values=study.maps.corrected.coverage;
  const mean=(100*values.reduce((s,v)=>s+v,0)/values.length).toFixed(2);
  assert.match(await page.locator('#coverage-title').textContent(),new RegExp(mean.replace('.','\\.')+'%'));
  await page.waitForFunction(()=>document.querySelector('#rq-row-plot').data?.length===4);
@@ -39,7 +39,11 @@ try{
  assert.ok(Math.abs(imageBox.width-coverageBox.width)<1);assert.ok(Math.abs(imageBox.y-coverageBox.y)<1);
  assert.ok(plotBox.y>=imageBox.y+imageBox.height);assert.ok(plotBox.width>imageBox.width*2);
  assert.equal(await page.locator('#coverage-status').isVisible(),false);
- console.log('PASS automatic coverage at captured K, matching settings, ellipse mean and original-observation plot');
+ assert.equal(await page.locator('#coverage-scale').isVisible(),true);
+ assert.equal(await page.locator('#coverage-scale .density-ticks span').count(),11);
+ const corner=await page.locator('#coverage-image').evaluate(el=>Array.from(el.getContext('2d').getImageData(0,0,1,1).data));
+ const {coverageBytes}=await import('../static/coverage-colors.js');assert.deepEqual(corner,Array.from(coverageBytes([values[0]])));
+ console.log('PASS automatic coverage at captured K, matching settings, whole-image mean and original-observation plot');
  // Restoring a reconstruction loads its study without submitting another run.
  await page.selectOption('#rq-analyses','');await page.selectOption('#rq-analyses',a.analysis_id);
  await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'));

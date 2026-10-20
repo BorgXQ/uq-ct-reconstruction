@@ -1,24 +1,25 @@
-import {ellipseCoverage} from './validation-presentation.js';
-import {mapBytes} from './exact-view.js';
+import {coverageBytes,viridisGradient} from './coverage-colors.js';
 import {api,get,watch} from './ct.js';
 const $=id=>document.getElementById(id);
 let selected=null,revision=0;
 const running=new Map();
-export function clearCoverage(){selected=null;revision++;$('coverage-image').hidden=true;$('coverage-title').textContent='Empirical coverage inside ellipse';$('coverage-status').hidden=false;$('coverage-status').textContent='Awaiting coverage validation.';}
+$('coverage-gradient').style.background=viridisGradient;
+export function clearCoverage(){selected=null;revision++;$('coverage-image').hidden=true;$('coverage-scale').hidden=true;$('coverage-title').textContent='Empirical coverage';$('coverage-status').hidden=false;$('coverage-status').textContent='Awaiting coverage validation.';}
 function status(a,text){if(selected===a.analysis_id){$('coverage-status').hidden=false;$('coverage-status').textContent=text;}}
 function render(study){
   const n=study.plan.geometry.resolution,values=study.maps.corrected?.coverage;
-  const summary=study.summaries.corrected,region=ellipseCoverage(values,n,.9,.9);
+  const summary=study.summaries.corrected,finite=values?.filter(Number.isFinite)??[];
+  const mean=finite.length?finite.reduce((sum,v)=>sum+v,0)/finite.length:null;
   $('coverage-status').textContent=`${study.status} · ${study.completed_trials}/${study.plan.trials} trials · fixed K = ${study.plan.iterations}.`;
-  $('coverage-image').hidden=!values;
+  $('coverage-image').hidden=!values;$('coverage-scale').hidden=!values;
   if(values){
-    const bytes=mapBytes(values,[0,1]);region.mask.forEach((inside,i)=>{if(!inside||!Number.isFinite(values[i]))bytes[i*4]=bytes[i*4+1]=bytes[i*4+2]=230;});
+    const bytes=coverageBytes(values);
     const small=document.createElement('canvas');small.width=small.height=n;small.getContext('2d').putImageData(new ImageData(bytes,n,n),0,0);
     const ctx=$('coverage-image').getContext('2d');ctx.imageSmoothingEnabled=false;ctx.drawImage(small,0,0,512,512);
-    ctx.strokeStyle='#2878b8';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(256,256,230.4,230.4,0,0,2*Math.PI);ctx.stroke();
+
   }
   $('coverage-status').hidden=study.status==='completed'&&!!values;
-  $('coverage-title').textContent=`Empirical coverage inside ellipse (mean = ${region.mean===null?'unavailable':(100*region.mean).toFixed(2)+'%'}; ${summary.returned_intervals}/${summary.planned} trials)`;
+  $('coverage-title').textContent=`Empirical coverage (mean = ${mean===null?'unavailable':(100*mean).toFixed(2)+'%'}, ${summary.returned_intervals} trials)`;
 }
 export async function restoreCoverage(a){
   selected=a.analysis_id;const token=++revision;

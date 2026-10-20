@@ -19,7 +19,7 @@ try{
  await page.fill('#vl-trials','6');await page.fill('#vl-k','10');await page.check('[name="vl-method"][value="exact"]');await page.check('[name="vl-method"][value="retained"]');
  await page.click('#vl-preflight');await page.waitForFunction(()=>document.querySelector('#vl-preflight-info').textContent.includes('workspace_bytes'));
  const fixed=await action('vl-run','/api/validation-studies');await page.waitForFunction(s=>document.querySelector('#vl-studies').value===s&&!document.querySelector('#vl-results').hidden,fixed.study_id);
- await page.waitForSelector('#vl-row-plot [data-role=interval-band]');
+ await page.waitForSelector('#vl-row-plot .js-fill');
  assert.equal(await page.locator('#vl-result-diagnostics').getAttribute('open'),null);
  assert.equal(await page.locator('#vl-main-reconstruction canvas').count(),1);
  assert.match(await page.locator('#vl-ellipse-summary').innerText(),/Mean coverage inside ellipse/);

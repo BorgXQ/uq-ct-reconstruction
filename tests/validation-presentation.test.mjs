@@ -9,18 +9,21 @@ test('ellipse uses pixel centers and excludes the exterior from the mean',()=>{
   assert.equal(ellipseCoverage(values,4,.01,.01).count,0);
   assert.throws(()=>ellipseCoverage(values,4,0,.5));
 });
-test('row plot centers the gray band on the single-trial red reconstruction',async()=>{
-  const {rowPlot}=await import('../static/validation-presentation.js');
-  const previous=globalThis.document;
-  globalThis.document={createElementNS:()=>({attrs:{},setAttribute(k,v){this.attrs[k]=v;}})};
-  const svg={children:[],replaceChildren(){this.children=[];},append(el){this.children.push(el);}};
-  try{
-    rowPlot(svg,[0,0,1,1],{center:[0,0,.2,.8],lower:[0,0,-.1,.5],upper:[0,0,.5,1.1]},2,1);
-    const lines=svg.children.filter(el=>el.attrs['data-role']==='trial-center');
-    assert.equal(lines.length,1);assert.equal(lines[0].attrs.stroke,'#c52b32');assert.equal(lines[0].attrs['stroke-dasharray'],'');
-    assert.equal(svg.children.some(el=>el.attrs['data-role']==='mean'),false);
-    const points=s=>s.split(' ').map(p=>p.split(',').map(Number));
-    const center=points(lines[0].attrs.points),band=points(svg.children.find(el=>el.attrs['data-role']==='interval-band').attrs.points);
-    for(let i=0;i<2;i++)assert.ok(Math.abs(center[i][1]-(band[i][1]+band[3-i][1])/2)<1e-10);
-  }finally{globalThis.document=previous;}
+test('Plotly traces preserve the selected reconstruction and raw intervals',async()=>{
+  const {rowFigure}=await import('../static/validation-presentation.js');
+  const truth=[0,0,1,1],trial={center:[0,0,.2,.8],lower:[0,0,-.1,.5],upper:[0,0,.5,1.1]};
+  const figure=rowFigure(truth,trial,2,1),data=figure.data;
+  const center=data.find(t=>t.meta.role==='trial-center');
+  assert.deepEqual(center.y,[.2,.8]);assert.deepEqual(center.x,[0,1]);
+  assert.equal(center.name,'Landweber mean');assert.equal(center.line.color,'#c52b32');
+  assert.deepEqual(data.find(t=>t.meta.role==='truth').y,[1,1]);
+  const lower=data.find(t=>t.meta.role==='interval-lower'),upper=data.find(t=>t.meta.role==='interval-upper');
+  assert.deepEqual(lower.y,[-.1,.5]);assert.deepEqual(upper.y,[.5,1.1]);
+  assert.equal(upper.fill,'tonexty');assert.equal(upper.name,'95% Confidence interval');
+  assert.deepEqual(center.customdata,[[-.1,.5],[.5,1.1]]);
+  assert.ok(figure.layout.yaxis.range[0]<-.1&&figure.layout.yaxis.range[1]>1.1);
+  assert.equal(rowFigure(truth,trial,2,1,.01).data[1].name,'99% Confidence interval');
+  const missing=rowFigure(truth,{center:trial.center},2,1);
+  assert.equal(missing.data.length,2);assert.match(missing.layout.annotations[0].text,/unavailable/);
+  assert.deepEqual(trial.lower,[0,0,-.1,.5]);
 });

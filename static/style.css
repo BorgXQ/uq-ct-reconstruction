@@ -63,3 +63,8 @@
 .image-with-scale > canvas[hidden] {display:none}
 
 .interval-chart {min-width:0;overflow:hidden;background:var(--panel)}
+
+.parameter-help {display:inline-grid;place-items:center;flex:none;width:17px;height:17px;min-width:17px;padding:0;border:1px solid #9baaa1;border-radius:50%;background:transparent;color:var(--muted);font:11px/1 system-ui;vertical-align:middle}
+.parameter-help:hover,.parameter-help:focus-visible {background:#e6eee5;color:var(--ink)}
+.parameter-tooltip {position:fixed;z-index:10000;width:max-content;max-width:min(320px,calc(100vw - 24px));padding:10px 12px;border:1px solid #b6c4b9;border-radius:6px;background:#fffef8;box-shadow:0 3px 14px #19312e24;color:var(--ink);font:12px/1.5 system-ui;pointer-events:none}
+#rq-new > .settings {align-items:center}

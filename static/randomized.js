@@ -3,18 +3,18 @@ import {api,get,watch} from './ct.js';
 import {limits,mapBytes,stoppingPlot} from './exact-view.js';
 const $=id=>document.getElementById(id),num=id=>Number($(id).value),uid=()=>crypto.randomUUID();
 const fmt=x=>Number.isFinite(x)?x.toPrecision(17):'unavailable';
+let rankResolution=null;
 let observations=[],truth=null,pendingObservation=null,base=null,view=null,diagnostic=null,history=[],generation=0,serial=0,inspectSerial=0,diagSerial=0,signature=null,inspectionJob=null,ownComparison=null;
 const guarded=fn=>async(...args)=>{try{await fn(...args);}catch(e){$('rq-error').textContent=e.message;}};
 const formSignature=()=>JSON.stringify([...$('rq-form').querySelectorAll('input,select')].map(e=>[e.id,e.type==='checkbox'?e.checked:e.value]));
 function options(id,rows,key,label){const el=$(id),old=el.value;el.replaceChildren(new Option('Select a record',''));for(const r of rows)el.add(new Option(label(r),r[key]));if(rows.some(r=>r[key]===old))el.value=old;}
 function controls(){
-  $('rq-source-fields').hidden=!$('rq-source').checked;
-  for(const id of ['rq-nu','rq-M','rq-source-provenance'])$(id).required=$('rq-source').checked;
-  $('rq-eta-provenance').required=$('rq-eta').value.trim()!=='';
   const automatic=$('rq-mode').value==='automatic';
+  $('rq-k-label').hidden=automatic;$('rq-budget-label').hidden=!automatic;
   $('rq-k').disabled=automatic;$('rq-k').required=!automatic;
   $('rq-budget').disabled=!automatic;$('rq-budget').required=automatic;
   const o=observations.find(o=>o.observation_id===$('rq-observation').value);
+  if(o&&o.resolution!==rankResolution){$('rq-rank').value=({16:32,32:64,64:128})[o.resolution]??Math.min(128,o.resolution*2);rankResolution=o.resolution;}
   $('rq-context').textContent=o?`${o.resolution} × ${o.resolution}; observation ${o.observation_id.slice(0,8)}; noise SD ${o.noise.sigma}.`:'Select an observation from Measure.';
   $('rq-submit').disabled=!o;$('rq-submit').textContent='Run reconstruction';
   if(base)$('rq-mismatch').textContent=signature===formSignature()?'Displayed result matches submitted controls.':'Displayed result keeps its captured settings. Recalculate to apply current controls.';
@@ -28,11 +28,11 @@ window.addEventListener('ct-observation-selected',e=>{pendingObservation=e.detai
 $('rq-observation').onchange=()=>{pendingObservation=$('rq-observation').value;};
 $('rq-form').addEventListener('input',()=>{generation++;controls();});$('rq-form').addEventListener('change',()=>{generation++;controls();});
 function request(){
-  const body={request_id:uid(),rank:num('rq-rank'),oversampling:num('rq-p'),sketch_seed:num('rq-sketch'),probe_seed:num('rq-probe'),probe_count:num('rq-count'),block_size:num('rq-block'),epsilon:num('rq-epsilon'),delta:num('rq-delta'),backend:$('rq-backend').value,reference:$('rq-reference').checked,
-    eta:$('rq-eta').value.trim()===''?null:{value:num('rq-eta'),provenance:$('rq-eta-provenance').value.trim()}};
-  return ['/api/randomized-analyses',{...body,observation_id:$('rq-observation').value,step_policy:$('rq-step').value,alpha:num('rq-alpha'),settings_origin:$('rq-origin').value,declaration:$('rq-declaration').value,
-    source:$('rq-source').checked?{M:num('rq-M'),nu:num('rq-nu'),provenance:$('rq-source-provenance').value}:null,
-    selection:$('rq-mode').value==='automatic'?{mode:'automatic',budget:num('rq-budget')}:{mode:'fixed',iterations:num('rq-k'),provenance:$('rq-origin').value==='declared_independent'?'fixed_predeclared':$('rq-origin').value==='retrospective'?'retrospective_inspection':'imported_selection_unknown'}}];
+  const body={request_id:uid(),rank:num('rq-rank'),oversampling:num('rq-p'),sketch_seed:num('rq-sketch'),probe_seed:num('rq-probe'),probe_count:num('rq-count'),block_size:num('rq-block'),epsilon:num('rq-epsilon'),delta:num('rq-delta'),backend:'matrix_free',reference:true,
+    eta:$('rq-eta').value.trim()===''?null:{value:num('rq-eta'),provenance:'User-specified omitted-bias assumption; not verified.'}};
+  return ['/api/randomized-analyses',{...body,observation_id:$('rq-observation').value,step_policy:'safe_induced_norm_v1',alpha:num('rq-alpha'),settings_origin:'unverified',declaration:'User-specified settings; noise independence has not been established.',
+    source:{M:num('rq-M'),nu:num('rq-nu'),provenance:'User-specified source assumption; not verified against the drawing.'},
+    selection:$('rq-mode').value==='automatic'?{mode:'automatic',budget:num('rq-budget')}:{mode:'fixed',iterations:num('rq-k'),provenance:'imported_selection_unknown'}}];
 }
 $('rq-form').onsubmit=guarded(async e=>{
   e.preventDefault();const [url,body]=request(),g=++generation,s=serial,sig=formSignature();$('rq-error').textContent='';

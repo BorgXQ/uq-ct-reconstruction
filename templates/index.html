@@ -3,7 +3,7 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Can We Trust This CT Reconstruction?</title><link rel="stylesheet" href="/static/style.css"></head>
 <body>
 <header><div class="eyebrow">COMPUTATIONAL IMAGING / LOCAL LAB</div><h1>Can We Trust This CT Reconstruction?</h1><p>Start with an object you know. Draw it, inspect its numerical grid, then freeze the ground truth.</p></header>
-<nav aria-label="Experiment workflow"><button id="nav-draw" data-workspace="draw" aria-current="step">01 <strong>Draw</strong> <small id="draw-state">ready</small></button><button id="nav-measure" data-workspace="measure" disabled>02 Measure <small id="measure-nav-state">not_ready</small></button><button id="nav-reconstruct" data-workspace="reconstruct" disabled>03 Reconstruct <small id="reconstruct-nav-state">not_ready</small></button><button id="nav-uq" data-workspace="uq" disabled>04 Uncertainty &amp; Validation <small id="uq-nav-state">not_ready</small></button></nav>
+<nav aria-label="Experiment workflow"><button id="nav-draw" data-workspace="draw" aria-current="step">01 <strong>Draw</strong> <small id="draw-state">ready</small></button><button id="nav-measure" data-workspace="measure" disabled>02 Measure <small id="measure-nav-state">not_ready</small></button><button id="nav-uq" data-workspace="uq" disabled>03 Reconstruct <small id="uq-nav-state">not_ready</small></button></nav>
 <main><div id="ct-error" role="alert" hidden></div><details id="job-panel" class="panel" hidden><summary>Numerical jobs</summary><div id="jobs"></div></details><section id="draw-workspace">
 <div class="workspace draw-grid">
 <section class="panel"><div class="panel-title"><div><span class="eyebrow">EDITABLE SOURCE</span><h2>Draw your object</h2></div><span class="tag">512 × 512</span></div>
@@ -29,5 +29,5 @@
 <p class="hint">Display shades are rounded to 8 bits. Inspection uses the stored float64 values.</p>
 </section>
 </div>
-</section>{% include "ct.html" %}{% include "exact.html" %}</main><footer>MILESTONE 006 · DRAW & MEASURE</footer><script type="module" src="/static/app.js"></script>
-<script type="module" src="/static/ct.js"></script><script type="module" src="/static/exact.js"></script><script type="module" src="/static/randomized.js"></script><script type="module" src="/static/validation.js"></script></body></html>
+</section>{% include "ct.html" %}{% include "reconstruct.html" %}</main><footer>MILESTONE 007 · RECONSTRUCT</footer><script type="module" src="/static/app.js"></script>
+<script type="module" src="/static/ct.js"></script><script type="module" src="/static/randomized.js"></script><script type="module" src="/static/validation.js"></script></body></html>

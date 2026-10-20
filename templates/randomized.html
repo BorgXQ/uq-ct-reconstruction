@@ -1,29 +1,21 @@
 <section class="panel" id="randomized-panel">
-  <span class="eyebrow">APPROXIMATION COMPARISON · MILESTONE 004</span>
-  <h2>Retained directions and what they leave out</h2>
-  <p>Compare uncertainties around the same full-operator Landweber image. A smaller retained variance excludes noise contributions; it does not improve the reconstructed image.</p>
+  <span class="eyebrow">03 / RECONSTRUCT</span><span id="uq-state" class="tag">not_ready</span>
+  <h2>Reconstruction settings</h2>
+  <p>Run Landweber on the selected measurement and calculate matching pixelwise uncertainty.</p>
   <form id="rq-form">
     <div class="settings">
-      <label>Route<select id="rq-route"><option value="compare">Compare a completed exact analysis at its K</option><option value="new">New randomized reconstruction &amp; uncertainty</option></select></label>
-      <label id="rq-exact-label">Exact analysis<select id="rq-exact"><option value="">Select a result</option></select></label>
-      <label id="rq-observation-label" hidden>Observation<select id="rq-observation"><option value="">Select an observation</option></select></label>
+      <label id="rq-observation-label">Observation<select id="rq-observation"><option value="">Select an observation</option></select></label>
     </div>
-    <p id="rq-context" class="hint">A common-K comparison preserves the exact result’s observation, source, alpha, step and center.</p>
-    <div class="settings">
-      <label>Retained rank r<input id="rq-rank" type="number" min="1" max="512" value="64" required></label>
-      <label>Oversampling p<input id="rq-p" type="number" min="4" max="64" value="10" required></label>
-      <label>Residual probes<input id="rq-count" type="number" min="1" max="1024" value="32" required></label>
-      <label>Omitted bias η<input id="rq-eta" type="number" min="0" step="any" placeholder="Not supplied"></label>
-      <label>η provenance<input id="rq-eta-provenance" maxlength="128" placeholder="Reason for this declared assumption"></label>
-    </div>
-    <p class="hint">η is an assumption, not a fitted parameter. With source parameters but no η, retained bias and stopping are available; total-error intervals are unavailable.</p>
-    <div id="rq-new" hidden>
+    <p id="rq-context" class="hint">Select a measured observation. Navigating here does not start a calculation.</p>
+    <div id="rq-new">
       <div class="settings">
-        <label>Selection<select id="rq-mode"><option value="fixed">Fixed K</option><option value="automatic">First randomized crossing (balance = 1)</option></select></label>
+        <label>Stopping mode<select id="rq-mode"><option value="fixed">Manual K</option><option value="automatic">First randomized crossing (balance = 1)</option></select></label>
         <label>Fixed iterations<input id="rq-k" type="number" min="1" max="5000" value="200"></label>
         <label>Search budget<input id="rq-budget" type="number" min="1" max="5000" value="1000"></label>
         <label>Step<select id="rq-step"><option value="safe_induced_norm_v1">Safe-norm half step (matrix-free)</option><option value="exact_spectral_half">Exact spectral half step (requires full SVD)</option></select></label>
       </div>
+    </div>
+    <details id="rq-source-options"><summary>Source assumptions &amp; confidence level</summary>
       <label class="uq-check"><input id="rq-source" type="checkbox"> Declare source condition x† = (AᵀA)ᵛw, ‖w‖ ≤ M</label>
       <div class="settings" id="rq-source-fields" hidden>
         <label>Exponent ν<input id="rq-nu" type="number" min="0" step="any" placeholder="Not supplied"></label>
@@ -35,7 +27,17 @@
         <label>Settings origin<select id="rq-origin"><option value="unverified">Independence unknown</option><option value="declared_independent">Declared before seeing measurement noise</option><option value="retrospective">Tuned after viewing results</option></select></label>
         <label>Declaration<input id="rq-declaration" maxlength="128" value="Noise independence has not been established."></label>
       </div>
+    </details>
+    <details id="rq-approx-options"><summary>Approximation settings</summary>
+    <div class="settings">
+      <label>Retained rank r<input id="rq-rank" type="number" min="1" max="512" value="64" required></label>
+      <label>Oversampling p<input id="rq-p" type="number" min="4" max="64" value="10" required></label>
+      <label>Residual probes<input id="rq-count" type="number" min="1" max="1024" value="32" required></label>
+      <label>Omitted bias η<input id="rq-eta" type="number" min="0" step="any" placeholder="Not supplied"></label>
+      <label>η provenance<input id="rq-eta-provenance" maxlength="128" placeholder="Reason for this declared assumption"></label>
     </div>
+    <p class="hint">η is an assumption, not a fitted parameter. With source parameters but no η, retained bias and stopping are available; total-error intervals are unavailable.</p>
+    </details>
     <details><summary>Randomization, covariance backend and probability targets</summary>
       <div class="settings">
         <label>Gaussian sketch seed<input id="rq-sketch" type="number" min="0" max="4294967295" value="0"></label>
@@ -49,16 +51,22 @@
       <p>Streams are independent of measurement noise and indexed by sample. Changing seeds creates a new analysis, never a new sinogram. The fixed probe count and ε/δ targets do not certify relative accuracy. Near-zero residual diagonals can make relative control especially difficult.</p>
       <p>Fixed K uses the direct Sₖ B Sₖ action. Automatic search uses a tested incremental covariance recurrence, checking every integer, followed by a direct selected-stage check. Work limits may refuse expensive settings; counts and image sizes are never silently reduced.</p>
     </details>
-    <button id="rq-submit" class="primary" type="submit">Calculate approximation comparison</button>
+    <button id="rq-submit" class="primary" type="submit">Run reconstruction</button>
   </form>
   <p id="rq-error" role="alert"></p><p id="rq-status" role="status">No randomized analysis selected.</p>
-  <div class="settings"><label>Saved randomized analysis<select id="rq-analyses"><option value="">Select a result</option></select></label><button id="rq-refresh">Refresh records</button></div>
+  <div class="settings"><label>Saved reconstruction<select id="rq-analyses"><option value="">Select a result</option></select></label><button id="rq-refresh">Refresh records</button></div>
 </section>
-<section id="rq-results" hidden><details><summary>Optional randomized-analysis maps &amp; diagnostics</summary>
+<section id="rq-results" hidden>
+<section class="panel" id="rq-primary"><h2>Reconstruction</h2><p id="rq-primary-context"></p><p id="rq-mismatch" class="hint"></p><p id="rq-primary-status" role="status"></p>
+<div class="settings"><label>Horizontal row (zero-based)<input id="rq-main-row" type="number" min="0" value="0"></label></div>
+<div class="rq-primary-grid"><div><canvas id="rq-main-image" width="512" height="512" role="img" aria-label="Landweber reconstruction with selected row marked"></canvas><p class="hint">Image display scale 0–1. Blue line marks the selected row.</p></div>
+<div><h3>Confidence intervals along the selected row</h3><svg id="rq-row-plot" viewBox="0 0 800 300" role="img" aria-label="Truth in black, selected reconstruction in red, confidence band in gray"></svg><p id="rq-row-caption"></p></div></div>
+</section>
+<details><summary>Optional randomized-analysis maps &amp; diagnostics</summary>
   <section class="panel">
-    <h3>Captured comparison</h3><p id="rq-summary"></p><p id="rq-mismatch" class="hint"></p>
+    <h3>Captured reconstruction</h3><p id="rq-summary"></p>
     <p id="rq-interpretation" class="uq-notice"></p><p id="rq-reference-status"></p>
-    <div class="settings"><label>Inspect iteration<input id="rq-inspect-k" type="number" min="0" max="5000" value="0"></label><button id="rq-inspect">Inspect matched image and uncertainty</button><button id="rq-diagnose">Check frozen truth (validation only)</button></div>
+    <div class="settings"><label>Inspect iteration<input id="rq-inspect-k" type="number" min="0" max="5000" value="0"></label><button id="rq-inspect">Inspect matched image and uncertainty</button><button id="rq-selected">Return to selected K</button><button id="rq-diagnose">Check frozen truth (validation only)</button></div>
     <p id="rq-inspection-status"></p>
     <div id="rq-map-grid" class="uq-grid"></div>
     <label>Additional map<select id="rq-map-choice">

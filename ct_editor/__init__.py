@@ -48,7 +48,7 @@ def create_app(config=None):
 
     @app.get("/api/health")
     def health():
-        return jsonify(status="ready", milestone="M6")
+        return jsonify(status="ready", milestone="M7")
 
     def capture():
         if not request.is_json:

@@ -1,7 +1,7 @@
 import {api,get,watch,refresh} from './ct.js';
 import {limits,mapBytes,stoppingPlot} from './exact-view.js';
 const $=id=>document.getElementById(id),id=()=>crypto.randomUUID(),fmt=x=>x===null||x===undefined?'unavailable':Number(x).toPrecision(17);
-let observations=[],runs=[],base=null,view=null,truth=null,diagnostic=null,lastInspected=null,lastObservation=null,history=[];
+let observations=[],runs=[],base=null,view=null,truth=null,diagnostic=null,lastInspected=null,history=[];
 let generation=0,selectionSerial=0,inspectionSerial=0,diagnosticSerial=0,listSerial=0,inspectionJob=null,acceptedForm=null;
 function error(e){$('ct-error').hidden=!e;$('ct-error').textContent=e?.message||e||'';}
 const safe=f=>async e=>{try{await f(e);}catch(e){error(e);}};
@@ -45,11 +45,6 @@ window.addEventListener('ct-records',e=>{observations=e.detail.observations;runs
   controls();lists().catch(error);
 });
 window.addEventListener('ct-inspected',e=>lastInspected=e.detail);
-window.addEventListener('ct-observation-selected',e=>lastObservation=e.detail);
-$('new-exact-observation').onclick=()=>{
-  if(!lastObservation)return;$('uq-route').value='new';$('uq-observation').value=lastObservation;
-  generation++;controls();stale();$('nav-uq').click();
-};
 window.addEventListener('ct-draft',()=>{if(base)$('uq-mismatch').textContent='Live editor changed or refreshed; analysis remains tied to its captured snapshot. Current form changes require a new calculation.';});
 $('analyze-reconstruction').onclick=()=>{
   if(!lastInspected)return;$('uq-route').value='attach';$('uq-run').value=lastInspected.reconstruction_id;$('uq-k').value=lastInspected.iteration;

@@ -31,7 +31,7 @@ function availability(){
   if(!observations.length)$('reconstruct-nav-state').textContent=$('reconstruct-state').textContent='not_ready';
   else if($('reconstruct-nav-state').textContent==='not_ready')$('reconstruct-nav-state').textContent=$('reconstruct-state').textContent='ready';
 }
-function currentGeometry(){return {n_angles:numeric('n-angles'),n_detectors:numeric('n-detectors'),start_degrees:numeric('angle-start'),end_degrees:numeric('angle-end')};}
+function currentGeometry(){return {n_angles:numeric('n-angles'),n_detectors:numeric('n-detectors'),start_degrees:0,end_degrees:180};}
 function currentNoise(){return {sigma:numeric('sigma'),seed:numeric('noise-seed')};}
 function scanMismatch(){
   if(!scan)return;
@@ -101,7 +101,7 @@ async function showObservation(id,{adoptForm=false}={}){
     if(adoptForm){
       selectSource(acquisition.snapshot_id,false);
       const g=acquisition.geometry;$('n-angles').value=g.sinogram_shape[0];$('n-detectors').value=g.sinogram_shape[1];
-      $('angle-start').value=g.range_degrees[0];$('angle-end').value=g.range_degrees[1];$('sigma').value=observation.noise.sigma;$('noise-seed').value=observation.noise.seed;
+      $('sigma').value=observation.noise.sigma;$('noise-seed').value=observation.noise.seed;
     }
     $('reconstruct-observation').value=id;reconstructGeneration++;await stepSummary();
     if(serial!==observationSerial)return;
@@ -114,18 +114,10 @@ function renderScan(){
   $('scan-results').hidden=false;paintRaster($('scan-truth'),Uint8Array.from(truth.pixels,x=>Math.round(255*x)),truth.resolution);
   drawSinogram($('clean-sinogram'),a.y_clean,na,nd,range);drawSinogram($('observed-sinogram'),o.y,na,nd,range);
   $('observed-title').textContent=o.noise.sigma===0?'Observed sinogram — no added noise':'Observed sinogram — Gaussian noise';
-  $('sino-low').textContent=range[0].toPrecision(6);$('sino-high').textContent=range[1].toPrecision(6);
   document.querySelectorAll('.sinogram-axes').forEach(el=>el.textContent=`Horizontal: normal angle ${(a.geometry.angles[0]*180/Math.PI).toFixed(2)}° → ${(a.geometry.angles.at(-1)*180/Math.PI).toFixed(2)}° (actual samples). Vertical: offset ${a.geometry.offsets[0].toFixed(4)} bottom → ${a.geometry.offsets.at(-1).toFixed(4)} top.`);
   $('scan-source').textContent=`Snapshot ${a.snapshot_id} · ${a.resolution} × ${a.resolution}`;
   $('scan-summary').textContent=`${na} angles × ${nd} offsets = ${na*nd} measurements · ${a.operator.nnz} sparse weights · σ ${o.noise.sigma}, seed ${o.noise.seed} · operator ${a.operator_cache_hit?'reused':'built'} · clean measurements ${a.clean_cache_hit?'reused':'computed'} · ${a.elapsed_seconds.toFixed(3)} s acquisition`;
-  const {y_clean,...am}=a,{y,...om}=o;$('scan-metadata').textContent=JSON.stringify({acquisition:am,observation:om},null,2);
-  $('ray-angle').max=na-1;$('ray-detector').max=nd-1;$('ray-angle').value=0;$('ray-detector').value=0;rayInspect();scanMismatch();
-}
-function rayInspect(){
-  if(!scan)return;const j=numeric('ray-angle'),ell=numeric('ray-detector'),{acquisition:a,observation:o}=scan;
-  if(!Number.isInteger(j)||!Number.isInteger(ell)||j<0||ell<0||j>=a.shape[0]||ell>=a.shape[1])throw new Error('Ray index outside the displayed scan.');
-  const mu=j*a.shape[1]+ell;
-  $('ray-info').textContent=`Acquisition ${a.acquisition_id}\nObservation ${o.observation_id}\nAngle index ${j}: ${(a.geometry.angles[j]*180/Math.PI).toPrecision(12)}°\nDetector index ${ell}: offset ${a.geometry.offsets[ell].toPrecision(17)}\nMeasurement index μ = ${mu}\nClean: ${a.y_clean[mu].toPrecision(17)}\nObserved: ${o.y[mu].toPrecision(17)}\nDifference (simulated noise): ${(o.y[mu]-a.y_clean[mu]).toPrecision(17)}`;
+  scanMismatch();
 }
 let stepSerial=0;
 async function stepSummary(){
@@ -240,12 +232,6 @@ async function newObservation(random){
 $('new-observation').onclick=safe(()=>newObservation(false));$('new-noise').onclick=safe(()=>newObservation(true));
 $('measure-observation').onchange=safe(async()=>{measureGeneration++;await showObservation($('measure-observation').value,{adoptForm:true});});
 $('acquisitions').onchange=safe(async()=>{measureGeneration++;const list=observations.filter(o=>o.acquisition_id===$('acquisitions').value);await showObservation(list.at(-1)?.observation_id||'',{adoptForm:true});});
-$('inspect-ray').onclick=safe(rayInspect);
-for(const id of ['clean-sinogram','observed-sinogram'])$(id).onclick=safe(e=>{
-  if(!scan)return;const rect=$(id).getBoundingClientRect(),[na,nd]=scan.acquisition.shape;
-  $('ray-angle').value=Math.min(na-1,Math.max(0,Math.floor((e.clientX-rect.left)*na/rect.width)));
-  $('ray-detector').value=nd-1-Math.min(nd-1,Math.max(0,Math.floor((e.clientY-rect.top)*nd/rect.height)));rayInspect();
-});
 $('reconstruct-observation').onchange=safe(async()=>{reconstructGeneration++;await stepSummary();runMismatch();});
 $('reconstruction-form').addEventListener('input',()=>{reconstructGeneration++;runMismatch();});
 $('step-mode').onchange=safe(async()=>{$('manual-step').disabled=$('step-mode').value!=='manual';$('manual-step').required=!$('manual-step').disabled;await stepSummary();runMismatch();});

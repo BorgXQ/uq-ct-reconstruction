@@ -9,7 +9,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from ct_editor import create_app
 from ct_editor.images import InputError
-from ct_editor.ct.geometry import Geometry, Operator, build_operator, ray_segments
+from ct_editor.ct.geometry import Geometry, Operator, build_operator, native_detector_offsets
 from ct_editor.ct.solver import landweber, replay, resolve_step
 from ct_editor.ct.diagnostics import ImageDiagnostics
 from ct_editor.ct.service import noise_settings, sample_observation
@@ -19,7 +19,7 @@ from test_images import request_for
 MATRIX=np.array([[1,0,1,0],[0,1,0,1],[0,0,1,1],[1,1,0,0]],float)
 TRUTH=np.array([0,1,.5,.25])
 
-def fixture(): return build_operator(Geometry.arrays(2,[0,np.pi/2],[-.5,.5]))
+def fixture(): return Operator(Geometry.arrays(2,[0,np.pi/2],[-.5,.5]),csr_matrix(MATRIX))
 
 def terminal(client,job_id):
     for _ in range(3000):
@@ -38,32 +38,54 @@ class GeometryTests(unittest.TestCase):
         self.assertLessEqual(np.linalg.norm(MATRIX,2)**2,4+1e-12)
         copy=op.sparse_copy();copy.data[:]=0;np.testing.assert_array_equal(op.sparse_copy().toarray(),MATRIX)
 
-    def test_lengths_edges_corners_and_single_pixel(self):
-        for theta in (0,np.pi/2): self.assertAlmostEqual(sum(ray_segments(4,theta,.125)[1]),2)
-        self.assertAlmostEqual(sum(ray_segments(4,np.pi/4,0)[1]),2*np.sqrt(2))
-        for theta,offset in [(0,2),(0,1),(0,-1),(np.pi/2,1),(np.pi/4,np.sqrt(2))]: self.assertEqual(ray_segments(4,theta,offset),([],[]))
-        self.assertEqual(ray_segments(2,0,0)[0],[3,1]) # upward ray, right column
-        self.assertEqual(ray_segments(2,np.pi/2,0)[0],[3,2]) # leftward ray, below
-        self.assertEqual(ray_segments(2,1e-14,0)[0],[3,1])
-        for offset in (-1e-8,1e-8): self.assertAlmostEqual(sum(ray_segments(2,1e-8,offset)[1]),2,places=10)
-        indices,weights=ray_segments(2,np.pi/4,.5)
-        row=np.zeros(4);row[indices]=weights
-        # Top-right unit square cut by u+v=sqrt(2)/2: two triangular endpoints.
-        self.assertAlmostEqual(row[1],1.0,places=10)
-        indices,weights=ray_segments(4,np.pi/4,np.sqrt(2)-1e-8)
-        self.assertGreater(sum(weights),0);self.assertLess(sum(weights),1e-6)
+    def test_subpixel_weights_and_pixel_units(self):
+        # A single unit pixel at angle zero deposits 1/8, 3/4, 1/8.
+        op=build_operator(Geometry.arrays(1,[0],[-1,0,1]))
+        np.testing.assert_allclose(op.forward([1]),[.125,.75,.125])
+        # Center of even image is MATLAB's floor((size+1)/2), not its
+        # geometric center. Horizontal/vertical offsets expose orientation.
+        native=native_detector_offsets(2)
+        op=build_operator(Geometry.arrays(2,[0,np.pi/2],native))
+        pixel=np.array([0.,1.,0.,0.])  # top right: x=1, y=0
+        expected=np.zeros((2,len(native)))
+        for angle,center in enumerate((1,0)):
+            for shift,weight in ((-1,.125),(0,.75),(1,.125)):
+                expected[angle,np.flatnonzero(native==center+shift)[0]]=weight
+        np.testing.assert_allclose(op.forward(pixel).reshape(expected.shape),expected,atol=1e-14)
+        # Projection mass per angle is image intensity sum in pixel units.
+        for side in (3,4,32):
+            offsets=native_detector_offsets(side)
+            geometry=Geometry.arrays(side,[0,.31,np.pi/2],offsets)
+            op=build_operator(geometry)
+            y=op.forward(np.ones(side**2)).reshape(3,-1)
+            np.testing.assert_allclose(y.sum(axis=1),side**2,rtol=1e-13)
+        self.assertEqual(len(native_detector_offsets(32)),49)
+        self.assertEqual(len(native_detector_offsets(64)),95)
+        self.assertEqual(len(native_detector_offsets(128)),185)
+
+    def test_custom_detectors_resample_native_profile(self):
+        side=5;native=native_detector_offsets(side);angles=[0,.73]
+        op=build_operator(Geometry.arrays(side,angles,native))
+        offsets=np.array([-100,-2.25,0,.5,100])
+        custom=build_operator(Geometry.arrays(side,angles,offsets))
+        image=np.arange(side**2,dtype=float)
+        reference=op.forward(image).reshape(2,-1)
+        expected=np.array([np.interp(offsets,native,row,left=0,right=0) for row in reference])
+        np.testing.assert_allclose(custom.forward(image).reshape(2,-1),expected,atol=1e-12)
+        for invalid in ([1,0],[0,0]):
+            with self.assertRaises(InputError): Geometry.arrays(side,angles,invalid)
 
     def test_arrays_linearity_adjoint_and_structure(self):
         for n,na,nd in [(3,7,8),(5,11,9),(16,17,20)]:
             g=Geometry.request(n,dict(n_angles=na,n_detectors=nd,start_degrees=10,end_degrees=140))
             self.assertAlmostEqual(g.angles[-1],np.deg2rad(10+(na-1)*130/na))
-            self.assertEqual(g.offsets[0],-np.sqrt(2));self.assertEqual(g.offsets[-1],np.sqrt(2))
+            self.assertEqual(g.offsets[0],native_detector_offsets(n)[0]);self.assertEqual(g.offsets[-1],native_detector_offsets(n)[-1])
             op=build_operator(g);a=op.sparse_copy();rng=np.random.default_rng(21)
             x=rng.normal(size=n*n);z=rng.normal(size=n*n);v=rng.normal(size=na*nd)
             np.testing.assert_allclose(op.forward(2*x-3*z),2*op.forward(x)-3*op.forward(z),atol=1e-10)
             self.assertAlmostEqual(op.forward(x)@v,x@op.adjoint(v),delta=1e-10)
             self.assertTrue(a.has_canonical_format);self.assertTrue(np.all(a.data>=0));self.assertTrue(np.all(np.isfinite(a.data)))
-            self.assertLessEqual(op.forward(np.ones(n*n)).max(),2*np.sqrt(2)+1e-10)
+            self.assertLessEqual(op.forward(np.ones(n*n)).max(),n*n+1e-10)
             np.testing.assert_array_equal(op.forward(np.zeros(n*n)),np.zeros(na*nd))
             self.assertEqual(build_operator(g).metadata()['csr_checksum'],op.metadata()['csr_checksum'])
         self.assertNotEqual(Geometry.arrays(2,[0],[0]).geometry_hash,Geometry.arrays(2,[.1],[0]).geometry_hash)

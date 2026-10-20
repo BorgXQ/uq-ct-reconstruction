@@ -132,7 +132,8 @@ class RandomizedServiceTests(unittest.TestCase):
         job=self.job('/api/randomized-analyses',self.rrequest(**updates))
         return self.c.get('/api/randomized-analyses/'+job['result']['analysis_id']).json
     def test_matrix_free_no_hidden_svd_and_noise_seed_invariance(self):
-        source=dict(M=.01,nu=.5,provenance='Test');eta=dict(value=.1,provenance='Test')
+        # Small declared source bound forces a crossing within this test's budget.
+        source=dict(M=.0001,nu=.5,provenance='Test');eta=dict(value=.1,provenance='Test')
         with patch.object(self.ex,'spectrum',side_effect=AssertionError('Hidden full SVD')):
             a=self.run_random(source=source,eta=eta,selection=dict(mode='automatic',budget=30))
             self.assertEqual(a['status'],'completed');self.assertFalse(a['coverage_expression_applicable'])

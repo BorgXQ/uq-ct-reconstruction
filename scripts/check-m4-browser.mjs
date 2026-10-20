@@ -45,7 +45,7 @@ try{
   assert.match(await page.locator('#rq-interpretation').textContent(),/unavailable/);
   console.log('PASS stale inspected-k responses and initialization state');
   await page.selectOption('#rq-observation',scan.observation_id);await page.uncheck('#rq-reference');await page.selectOption('#rq-mode','automatic');await field('rq-budget',50);
-  await page.check('#rq-source');await field('rq-nu',.5);await field('rq-M',.01);await field('rq-source-provenance','Predeclared test');await page.selectOption('#rq-origin','declared_independent');
+  await page.check('#rq-source');await field('rq-nu',.5);await field('rq-M',.0001);await field('rq-source-provenance','Predeclared test');await page.selectOption('#rq-origin','declared_independent');
   const automatic=await run('/api/randomized-analyses');assert.equal(automatic.status,'completed');assert.ok(automatic.selected_k>=1);assert.equal(automatic.reference.status,'unavailable');
   const rec=await get('/api/reconstructions/'+automatic.reconstruction_id);assert.deepEqual(rec.pixels,automatic.center);
   await field('rq-alpha',.01);await field('rq-eta',.5);const altered=await run('/api/randomized-analyses');assert.equal(altered.selected_k,automatic.selected_k);assert.notDeepEqual(altered.total_half_width,automatic.total_half_width);

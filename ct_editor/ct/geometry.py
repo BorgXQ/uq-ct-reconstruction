@@ -1,4 +1,8 @@
-"""Parallel-ray, piecewise-constant projector; lengths in [-1,1]^2."""
+"""MATLAB-style Radon: four subpixels deposited into unit-spaced detector bins.
+
+Forward units are pixels; the image display domain remains [-1,1]^2.
+The reconstruction adjoint is the exact transpose, not unfiltered iradon.
+"""
 from dataclasses import dataclass
 import hashlib
 import json
@@ -6,12 +10,18 @@ import math
 from time import perf_counter
 
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, vstack
 
 from ..images import InputError, canonical
 
 TOL = 1e-12
-BUILDER = 'ray_segments_v1'
+BUILDER = 'matlab_subpixel_bins_v1'
+
+
+def native_detector_offsets(resolution):
+    """Square-image MATLAB radial extent, including one padding bin per side."""
+    radius = math.ceil(math.sqrt(2) * (resolution // 2)) + 1
+    return np.arange(-radius, radius + 1, dtype=np.float64)
 
 
 def integer(value, name, low, high):
@@ -55,11 +65,17 @@ class Geometry:
         angles = np.asarray(angles, dtype='<f8'); offsets = np.asarray(offsets, dtype='<f8')
         if resolution < 1 or angles.ndim != 1 or offsets.ndim != 1 or not angles.size or not offsets.size or not np.isfinite(angles).all() or not np.isfinite(offsets).all():
             raise InputError('Invalid geometry arrays.')
+        if offsets.size > 1 and not np.all(np.diff(offsets) > 0):
+            raise InputError('Detector offsets must be strictly increasing.')
         header = dict(resolution=resolution, image_shape=[resolution,resolution], domain=[[-1,1],[-1,1]],
             pixel_width=2/resolution, row_origin='top', column_origin='left', image_order='C',
-            sinogram_shape=[len(angles),len(offsets)], measurement_order='angle_major', angle_units='radians', offset_units='dimensionless',
-            model='parallel_piecewise_constant', builder=BUILDER, boundary='internal_right_below_outer_zero',
-            tolerance=TOL, tolerance_policy='absolute_direction_and_scaled_coordinate_parameter_v1', dtype='float64', byte_order='little', range_degrees=range_degrees)
+            sinogram_shape=[len(angles),len(offsets)], measurement_order='angle_major', angle_units='radians', offset_units='pixels',
+            model='parallel_subpixel_detector_bins', builder=BUILDER,
+            projection_pixel_width=1.0, projection_origin_index=(resolution+1)//2-1,
+            subpixel_offsets=[-.25,.25], subpixel_weight=.25,
+            detector_sampling='linear_resample_native_bins_zero_outside',
+            boundary='zero_outside_native_detector_extent',
+            tolerance=TOL, tolerance_policy='float64_linear_bin_weights', dtype='float64', byte_order='little', range_degrees=range_degrees)
         a,b=angles.tobytes(),offsets.tobytes()
         return cls(resolution,a,b,json.dumps(header,sort_keys=True),hashlib.sha256(canonical(header,a+b)).hexdigest())
 
@@ -69,7 +85,9 @@ class Geometry:
         na=integer(data['n_angles'],'n_angles',1,360); nd=integer(data['n_detectors'],'n_detectors',2,256)
         start=scalar(data['start_degrees'],'start_degrees',0,180); end=scalar(data['end_degrees'],'end_degrees',0,180)
         if start >= end: raise InputError('Angular start must be less than end.', 'start_degrees')
-        return cls.arrays(resolution,np.deg2rad(np.linspace(start,end,na,endpoint=False)),np.linspace(-np.sqrt(2),np.sqrt(2),nd),[start,end])
+        native = native_detector_offsets(resolution)
+        return cls.arrays(resolution,np.deg2rad(np.linspace(start,end,na,endpoint=False)),
+            np.linspace(native[0],native[-1],nd),[start,end])
 
     @property
     def angles(self): return np.frombuffer(self.angle_bytes,dtype='<f8')
@@ -80,50 +98,19 @@ class Geometry:
     def metadata(self):
         return {**json.loads(self.header), 'geometry_hash':self.geometry_hash, 'angles':self.angles.tolist(), 'offsets':self.offsets.tolist()}
     def estimate_bytes(self):
-        # Preallocated COO buffers, CSR conversion/copies, indices and work vectors.
+        # Each native pixel touches at most three bins per angle. Resampling
+        # can extend the three nonzero bins to a support width of four
+        # native-bin units. Bound output
+        # storage, construction copies, and the per-angle COO workspace.
         m,n=self.shape
-        return m*(2*self.resolution+1)*64 + (m+n)*64 + 16384
-
-
-def ray_segments(n, theta, offset):
-    """Slab clip, deduplicate crossings, assign midpoint; no pixel-center quadrature."""
-    normal=np.array([math.cos(theta),math.sin(theta)])
-    normal[np.abs(normal)<TOL]=0
-    normal/=np.linalg.norm(normal)
-    base=offset*normal; direction=np.array([-normal[1],normal[0]])
-    enter,leave=-np.inf,np.inf
-    for origin,d in zip(base,direction):
-        if d == 0:
-            if abs(origin) >= 1-TOL: return [],[]  # miss or outer-edge coincidence
+        spacing=np.diff(self.offsets)
+        if np.array_equal(self.offsets,native_detector_offsets(self.resolution)):
+            per_pixel=3
         else:
-            t0,t1=sorted(((-1-origin)/d,(1-origin)/d))
-            enter=max(enter,t0);leave=min(leave,t1)
-    eps=TOL*max(1,abs(enter),abs(leave))
-    if leave-enter <= eps: return [],[]
-    ts=[enter,leave]
-    edges=np.linspace(-1,1,n+1)[1:-1]
-    for origin,d in zip(base,direction):
-        if d != 0:
-            cuts=(edges-origin)/d
-            ts.extend(cuts[(cuts>enter+eps)&(cuts<leave-eps)])
-    ts.sort(); unique=[ts[0]]
-    for t in ts[1:]:
-        if t-unique[-1]>eps: unique.append(t)
-    # Keep the exact clipping endpoint even when a crossing lies within tolerance.
-    unique[-1]=leave
-    indices=[];weights=[]
-    for lo,hi in zip(unique,unique[1:]):
-        if hi-lo <= eps: continue
-        u,v=base+(lo+hi)/2*direction
-        coordinates=np.array([(1-v)*n/2,(u+1)*n/2])
-        nearest=np.rint(coordinates)
-        on_internal=(nearest>0)&(nearest<n)&(np.abs(coordinates-nearest)<=TOL*n)
-        coordinates=np.where(on_internal,nearest,coordinates)
-        row,col=np.floor(coordinates).astype(int)
-        if not (0<=row<n and 0<=col<n):
-            raise InputError('Ray midpoint outside domain under the declared tolerance.',code='geometry_failure',status=422)
-        indices.append(int(row*n+col));weights.append(float(hi-lo))
-    return indices,weights
+            per_pixel=(min(len(self.offsets), math.ceil(4/spacing.min()))
+                       if spacing.size else 1)
+        entries=len(self.angles)*n*per_pixel
+        return entries*40 + n*8*32 + (m+n)*64 + 16384
 
 
 class Operator:
@@ -163,16 +150,52 @@ class Operator:
     def adjoint_block(self,x): return self._matrix.T @ self._block(x,self.shape[0])
 
 
+def detector_resampling(native, offsets):
+    """Linear sampling of native bin values; no extrapolation or amplitude fit."""
+    q=offsets-native[0]
+    lo=np.floor(q).astype(int);fraction=q-lo
+    rows=[];cols=[];values=[]
+    inside=(q>=0)&(q<=len(native)-1)
+    for shift,weight in ((0,1-fraction),(1,fraction)):
+        col=lo+shift
+        valid=inside&(col>=0)&(col<len(native))&(weight>0)
+        rows.extend(np.flatnonzero(valid));cols.extend(col[valid]);values.extend(weight[valid])
+    return csr_matrix((values,(rows,cols)),shape=(len(offsets),len(native)))
+
+
 def build_operator(geometry, check=lambda:None, progress=lambda *args:None):
-    start=perf_counter();m,n=geometry.shape;limit=m*(2*geometry.resolution+1)
-    rows=np.empty(limit,np.int32);cols=np.empty(limit,np.int32);values=np.empty(limit,np.float64);used=0
+    """Deposit four quarter-intensity subpixels into neighboring native bins.
+
+    Matches the documented MATLAB radon discretization at native integer
+    detector offsets. Custom detector counts sample that native profile.
+    https://www.mathworks.com/help/images/ref/radon.html
+    """
+    start=perf_counter();side=geometry.resolution;n=side**2
+    native=native_detector_offsets(side)
+    sampling=detector_resampling(native,geometry.offsets)
+    row,col=np.indices((side,side),dtype=np.float64)
+    origin=(side+1)//2-1
+    x=col.ravel()-origin;y=origin-row.ravel()
+    pixels=np.arange(n,dtype=np.int32)
+    blocks=[]
     for j,theta in enumerate(geometry.angles):
         check()
-        for ell,offset in enumerate(geometry.offsets):
-            check()
-            indices,weights=ray_segments(geometry.resolution,theta,offset);count=len(indices)
-            rows[used:used+count]=j*len(geometry.offsets)+ell;cols[used:used+count]=indices;values[used:used+count]=weights;used+=count
+        cosine,sine=np.cos(theta),np.sin(theta)
+        rows=[];cols=[];values=[]
+        for dx in (-.25,.25):
+            for dy in (-.25,.25):
+                check()
+                position=(x+dx)*cosine+(y+dy)*sine-native[0]
+                lower=np.floor(position).astype(np.int32);fraction=position-lower
+                for shift,weight in ((0,.25*(1-fraction)),(1,.25*fraction)):
+                    detector=lower+shift
+                    valid=(detector>=0)&(detector<len(native))&(weight>0)
+                    rows.append(detector[valid]);cols.append(pixels[valid]);values.append(weight[valid])
+        block=csr_matrix((np.concatenate(values),(np.concatenate(rows),np.concatenate(cols))),
+                         shape=(len(native),n))
+        blocks.append(sampling@block)
         progress('Building operator',j+1,len(geometry.angles))
     check()
-    matrix=csr_matrix((values[:used],(rows[:used],cols[:used])),shape=(m,n))
+    matrix=vstack(blocks,format='csr')
+    del blocks
     return Operator(geometry,matrix,perf_counter()-start)

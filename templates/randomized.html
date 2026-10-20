@@ -29,6 +29,7 @@
       <label>Relative tolerance (ε)<input id="rq-epsilon" type="number" min="0" max="1" step="any" value="0.2" required></label>
       <label>Failure target (δ)<input id="rq-delta" type="number" min="0" max="1" step="any" value="0.01" required></label>
     </div></details>
+    <div class="settings"><label>Number of trials<input id="rq-trials" type="number" min="1" max="10000" value="100" required></label></div>
     <button id="rq-submit" class="primary" type="submit">Run reconstruction</button>
   </form>
   <p id="rq-error" role="alert"></p><p id="rq-status" role="status">No randomized analysis selected.</p>
@@ -36,44 +37,11 @@
 </section>
 <section id="rq-results" hidden>
 <section class="panel" id="rq-primary"><h2>Reconstruction</h2><p id="rq-primary-context"></p><p id="rq-mismatch" class="hint"></p><p id="rq-primary-status" role="status"></p>
+<div class="rq-primary-grid">
+<div class="reconstruction-plot-card"><h3>Reconstructed image</h3><div class="image-with-scale"><canvas id="rq-main-image" width="512" height="512" role="img" aria-label="Landweber reconstruction with selected row marked blue"></canvas>{% include 'density-scale.html' %}</div></div>
+<div class="reconstruction-plot-card" id="coverage-panel"><h3 id="coverage-title" aria-live="polite">Empirical coverage inside ellipse</h3><div><p id="coverage-status" role="status">Run reconstruction to calculate coverage.</p><canvas id="coverage-image" width="512" height="512" role="img" aria-label="Empirical coverage inside the centered ellipse; black 0%, white 100%, gray outside; radii 0.9 in normalized image coordinates" hidden></canvas></div></div>
+</div>
+<div class="reconstruction-plot-card rq-interval-panel"><h3>Confidence intervals along the selected row</h3>
 <div class="settings"><label>Horizontal row (zero-based)<input id="rq-main-row" type="number" min="0" value="0"></label></div>
-<div class="rq-primary-grid"><div class="reconstruction-plot-card"><h3>Reconstructed image</h3><div class="image-with-scale"><canvas id="rq-main-image" width="512" height="512" role="img" aria-label="Landweber reconstruction with selected row marked blue"></canvas>{% include 'density-scale.html' %}</div></div>
-<div class="reconstruction-plot-card"><h3>Confidence intervals along the selected row</h3><div id="rq-row-plot" class="interval-chart" role="img" aria-label="Interactive density plot: truth, Landweber mean and confidence interval"></div></div></div>
-</section>
-<details><summary>Optional randomized-analysis maps &amp; diagnostics</summary>
-  <section class="panel">
-    <h3>Captured reconstruction</h3><p id="rq-summary"></p>
-    <p id="rq-interpretation" class="uq-notice"></p><p id="rq-reference-status"></p>
-    <div class="settings"><label>Inspect iteration<input id="rq-inspect-k" type="number" min="0" max="5000" value="0"></label><button id="rq-inspect">Inspect matched image and uncertainty</button><button id="rq-selected">Return to selected K</button><button id="rq-diagnose">Check frozen truth (validation only)</button></div>
-    <p id="rq-inspection-status"></p>
-    <div id="rq-map-grid" class="uq-grid"></div>
-    <label>Additional map<select id="rq-map-choice">
-      <option value="signed_residual">Signed estimated covariance residual (variance units)</option>
-      <option value="exact_residual">Exact full-minus-randomized residual</option>
-      <option value="residual_estimation_error">Estimated minus exact residual</option>
-      <option value="correction_minus_full">Corrected minus full variance (negative = underestimation)</option>
-      <option value="tsvd_retained_variance">Exact TSVD retained variance</option>
-      <option value="tsvd_omitted_variance">Exact TSVD omitted variance</option>
-      <option value="total_half_width">Corrected total interval half-width</option>
-      <option value="lower">Corrected lower endpoint</option><option value="upper">Corrected upper endpoint</option>
-      <option value="full_total_half_width">Full-reference interval half-width</option>
-      <option value="tsvd_half_width">Fully accounted TSVD interval half-width</option>
-      <option value="actual_bias">Actual bias — validation only</option>
-      <option value="absolute_error">Absolute error — validation only</option>
-      <option value="inclusion">Single-run inclusion — validation only</option>
-    </select></label><div id="rq-extra" class="rq-extra"></div>
-    <div class="settings"><label>Row<input id="rq-row" type="number" min="0" value="0"></label><label>Column<input id="rq-col" type="number" min="0" value="0"></label><button id="rq-pixel">Inspect pixel</button></div>
-    <pre id="rq-pixel-info" aria-live="polite"></pre>
-    <details open><summary>Bias contributions</summary><p id="rq-bias"></p></details>
-    <details><summary>Normal-operator eigenvalues and retained-rank boundary</summary><p>Eigenvalues λ = s², decreasing index. Leading normal directions need not have the largest finite-iteration covariance variance.</p><svg id="rq-spectrum" viewBox="0 0 600 240" aria-label="Normal operator eigenvalues and retained rank boundary" role="img"></svg></details>
-    <details open><summary>Randomized stopping</summary><p id="rq-stopping-label"></p><p class="hint">Orange: retained bias approximation. Green: maximum corrected noise scale. η and α do not enter this comparison.</p><svg id="rq-stopping" viewBox="0 0 600 240" aria-label="Randomized stopping history" role="img"></svg></details>
-    <details><summary>Conditions, probability targets and supporting lemma</summary><pre id="rq-conditions"></pre></details>
-    <details><summary>Captured settings, dimensions, seeds and measured costs</summary><pre id="rq-metadata"></pre></details>
-    <details id="rq-diagnostic-panel"><summary>Opt-in diagnostic evidence</summary><p id="rq-diagnostic-status">Not requested.</p><pre id="rq-diagnostic-info"></pre></details>
-  </section>
-  <section class="panel"><h3>Compare each method at its own stopping point</h3>
-    <p>This explicit action searches both criteria with the same observation, step and source. Each method has its own K and full-operator reconstruction. No crossing remains an unmet criterion.</p>
-    <div class="settings"><label>Budget<input id="rq-own-budget" type="number" min="1" max="5000" value="1000"></label><label>Exact balance c₀<input id="rq-own-c0" type="number" min="0" step="any" value="1"></label><label>Exact bias policy<select id="rq-own-bound"><option value="spectral">Spectral</option><option value="global">Exact-half global</option><option value="safe_global">Safe-half global</option></select></label><button id="rq-own">Compare stopping points</button></div>
-    <p id="rq-own-summary"></p><div id="rq-own-maps" class="uq-grid"></div><pre id="rq-own-pixel"></pre><pre id="rq-own-info"></pre>
-  </section>
-</details></section>
+<div id="rq-row-plot" class="interval-chart" role="img" aria-label="Interactive density plot: truth, Landweber mean and confidence interval"></div></div>
+</section></section>

@@ -15,6 +15,7 @@ const help={
   acquisitions:'Choose a saved geometry and its clean projections.',
   'measure-observation':'Choose a saved noisy sinogram from this acquisition.',
   'rq-observation':'The measured sinogram to reconstruct. Its image grid determines the initial retained rank.',
+  'rq-trials':'Number of independent measurement-noise trials used to estimate coverage. Uses this reconstruction’s selected K, factors and uncertainty settings; defaults to 100.',
   'rq-mode':'B̃ₖ ≤ vₖ stops at the first K where the retained bias approximation is no larger than the maximum corrected pixel standard deviation (balance = 1). NONE runs a fixed K. An unmet condition does not silently use the maximum as a reconstruction.',
   'rq-budget':'Largest K searched for B̃ₖ ≤ vₖ. Default 1500; the search may stop earlier. This is a limit, not a target iteration count.',
   'rq-k':'Number of Landweber iterations when stopping mode is NONE. Default 500. More iterations can recover detail but amplify measurement noise.',

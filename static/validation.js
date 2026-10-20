@@ -113,3 +113,8 @@ function renderMain(){
 }
 $('vl-main-trial').onchange=guard(loadMain);
 for(const id of ['vl-main-row','vl-ellipse-x','vl-ellipse-y'])$(id).onchange=guard(renderMain);
+
+window.addEventListener('randomized-selected',guard(async e=>{
+  const id=e.detail.analysis_id;await refresh();
+  $('vl-template').value='randomized:'+id;$('vl-k').value=e.detail.iteration;context();invalidateGrid();
+}));

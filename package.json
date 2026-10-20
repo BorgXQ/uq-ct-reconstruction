@@ -7,9 +7,13 @@
     "test:browser": "node scripts/check-browser.mjs",
     "test:browser:m4": "node scripts/check-m4-browser.mjs",
     "test:browser:m5": "node scripts/check-m5-browser.mjs",
-    "test:browser:m7": "node scripts/check-m7-browser.mjs"
+    "test:browser:m7": "node scripts/check-m7-browser.mjs",
+    "vendor:plotly": "node scripts/vendor-plotly.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0"
+  },
+  "dependencies": {
+    "plotly.js-basic-dist-min": "4.1.2"
   }
 }

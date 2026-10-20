@@ -7,7 +7,8 @@
     "test:browser": "node scripts/check-browser.mjs",
     "test:browser:m2": "node scripts/check-m2-browser.mjs",
     "test:browser:m3": "node scripts/check-m3-browser.mjs",
-    "test:browser:m4": "node scripts/check-m4-browser.mjs"
+    "test:browser:m4": "node scripts/check-m4-browser.mjs",
+    "test:browser:m5": "node scripts/check-m5-browser.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0"

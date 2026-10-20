@@ -27,3 +27,11 @@
 #vl-row-plot { display:block; width:100%; height:auto; }
 #vl-result-diagnostics { margin:1rem 0; }
 @media(max-width:700px) { .vl-main-images { grid-template-columns:1fr; } }
+
+/* M6: equal Draw cards and image sizes; job details expand only on request. */
+#draw-workspace .draw-grid { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; }
+#draw-workspace .draw-grid > .panel { min-width:0; }
+#draw-workspace #overlay { pointer-events:none; cursor:default; }
+#measure-workspace .sinogram { cursor:default; }
+#job-panel > summary { font-weight:600; }
+@media(max-width:900px) { #draw-workspace .draw-grid { grid-template-columns:1fr; } }

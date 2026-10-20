@@ -39,7 +39,7 @@
     <p id="uq-status" role="status">No analysis selected.</p>
     <div class="settings"><label>Retained analysis<select id="uq-analyses"><option value="">Select a record</option></select></label><button id="uq-refresh">Refresh records</button></div>
   </section>
-  <section id="uq-results" hidden>
+  <section id="uq-results" hidden><details><summary>Optional exact-analysis maps &amp; diagnostics</summary>
     <section class="panel">
       <h3 id="uq-result-title">Analysis</h3><button id="compare-exact">Compare approximations at this K</button><p id="uq-summary"></p><p id="uq-interpretation" class="uq-notice"></p>
       <p id="uq-mismatch" class="hint"></p>
@@ -66,7 +66,7 @@
     <section class="panel"><h3>Bias allowance versus maximum pixel SD</h3><p id="uq-stopping-label"></p><svg id="uq-stopping-chart" viewBox="0 0 600 240" role="img" aria-label="Bias and noise stopping history"></svg><p class="hint">Orange: Bₖ. Teal: c₀ maxᵢ SDₖ,ᵢ. Both in density units. Only actually evaluated candidates are plotted.</p></section>
     <section class="panel"><h3>Validation only</h3><p>These checks use the original frozen truth. They cannot fit M or ν, select K, or change the interval.</p><button id="uq-diagnose">Run truth diagnostics for selected K</button><p id="uq-diagnostic-status">Not requested. Single-run spatial inclusion is not repeated-measurement coverage.</p><pre id="uq-diagnostic-info"></pre></section>
     <details class="panel"><summary>Assumptions, numerical evidence &amp; captured configuration</summary><pre id="uq-assumptions"></pre><pre id="uq-details"></pre><p id="uq-joint"></p></details>
-  </section>
+  </details></section>
   <details class="panel"><summary>How should I interpret these intervals?</summary>
     <p>Gaussian measurement noise passes through the fixed linear reconstruction, giving Γₖ = σ²TₖTₖᵀ. SD describes random variability; it excludes systematic reconstruction bias.</p>
     <p>A declared source class supplies a shared bias allowance Bₖ. Each raw interval is reconstructed density ± (z SD + Bₖ). Missing source assumptions leave total-error intervals unavailable. The allowance bounds image-wide bias and can be conservative at one pixel.</p>

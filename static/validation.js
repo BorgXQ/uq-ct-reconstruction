@@ -1,5 +1,7 @@
+import {ellipseCoverage,rowPlot} from './validation-presentation.js';
 import {mapBytes,limits} from './exact-view.js';
 const $=id=>document.getElementById(id),uid=()=>crypto.randomUUID(),num=id=>Number($(id).value),csv=id=>$(id).value.trim()?$(id).value.split(',').map(v=>Number(v.trim())):[];
+let mainTrial=null,mainSerial=0;
 let templates=[],study=null,serial=0,pixelSerial=0,currentJob=null,reviewedGrid=null,lastGrid=null;
 const fmt=x=>x==null?'unavailable':Number(x).toPrecision(6);
 async function api(path,data){const response=await fetch(path,data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await response.json();if(!response.ok)throw Error(result.error?.message||'Request failed');return result;}
@@ -28,14 +30,14 @@ $('vl-form').onsubmit=guard(async e=>{e.preventDefault();const generation=++seri
 $('vl-cancel').onclick=guard(async()=>{if(currentJob)await api('/api/jobs/'+currentJob+'/cancel',{});});
 $('vl-studies').onchange=guard(()=>show($('vl-studies').value));
 const labels={mean:'Empirical mean',coverage:'Marginal coverage among returned intervals',mean_width:'Mean full interval width',empirical_variance:'Sample variance',full_variance:'Full-model variance',mean_reference:'Noiseless mean reference',mean_difference:'Empirical mean minus reference',actual_bias:'Actual signed bias',mc_lower:'Wilson lower bound for coverage',mc_upper:'Wilson upper bound for coverage',mc_se:'Monte Carlo SE of coverage',mse:'Mean squared error',returned_and_covered:'Operational returned-and-covered fraction'};
-async function show(sid){const token=++serial;++pixelSerial;study=null;$('vl-results').hidden=true;if(!sid)return;const s=await api('/api/validation-studies/'+sid+'?arrays=1');if(token!==serial)return;study=s;$('vl-studies').value=sid;$('vl-results').hidden=false;
+async function show(sid){const token=++serial;++pixelSerial;study=null;mainTrial=null;++mainSerial;$('vl-results').hidden=true;if(!sid)return;const s=await api('/api/validation-studies/'+sid+'?arrays=1');if(token!==serial)return;study=s;$('vl-studies').value=sid;$('vl-results').hidden=false;
   options('vl-method',s.plan.methods.map(method=>({method})),'method',x=>x.method);options('vl-map-choice',Object.keys(labels).map(key=>({key})),'key',x=>labels[x.key]);$('vl-map-choice').value='empirical_variance';
   $('vl-interpretation').textContent=`${s.plan.protocol} · ${s.plan.comparison} · ${s.completed_trials}/${s.plan.trials} committed trials · ${s.status}. ${s.conditioning}. ${s.interpretation} Wilson bounds describe coverage-estimation error, not image intensity.`;
   $('vl-summary').textContent=JSON.stringify({summaries:s.summaries,paired:s.paired_comparisons,source:s.source_check,timing:s.timing,configuration:s.configuration,plan:s.plan},null,2);$('vl-bias-curve').textContent=JSON.stringify(s.bias_curve,null,2);
   $('vl-row').max=$('vl-col').max=s.plan.geometry.resolution-1;$('vl-row').value=$('vl-col').value=0;
   options('vl-representative',s.representatives.map(v=>({...v,key:v.trial_index+'_'+v.method})),'key',v=>`Trial ${v.trial_index} · ${v.method} · K ${v.k}`);
   const table=document.createElement('table');const tr=document.createElement('tr');for(const title of ['Method','Centers / planned','Intervals / planned','Mean coverage','Mean full width','Mean trial RMSE','All-pixel inclusion']){const th=document.createElement('th');th.textContent=title;tr.append(th);}table.append(tr);
-  for(const [m,a] of Object.entries(s.summaries)){const row=document.createElement('tr');for(const v of [m,`${a.numeric_centers}/${a.planned}`,`${a.returned_intervals}/${a.planned}`,fmt(a.mean_coverage),fmt(a.mean_full_width),fmt(a.mean_trial_rmse),fmt(a.all_pixel_inclusion)]){const td=document.createElement('td');td.textContent=v;row.append(td);}table.append(row);}$('vl-table').replaceChildren(table);render();await pixel();
+  for(const [m,a] of Object.entries(s.summaries)){const row=document.createElement('tr');for(const v of [m,`${a.numeric_centers}/${a.planned}`,`${a.returned_intervals}/${a.planned}`,fmt(a.mean_coverage),fmt(a.mean_full_width),fmt(a.mean_trial_rmse),fmt(a.all_pixel_inclusion)]){const td=document.createElement('td');td.textContent=v;row.append(td);}table.append(row);}$('vl-table').replaceChildren(table);$('vl-main-row').max=s.plan.geometry.resolution-1;$('vl-main-row').value=Math.floor(s.plan.geometry.resolution/2);render();await loadMain();await pixel();
 }
 function map(parent,values,title,key){const card=document.createElement('article');card.className='rq-card';const h=document.createElement('h4');h.textContent=title;card.append(h);parent.append(card);
   if(!values){const p=document.createElement('p');p.textContent='Unavailable for this conditioning, sample count or reference.';card.append(p);return;}
@@ -52,7 +54,7 @@ function plotSeries(data,truth){const svg=$('vl-series');svg.replaceChildren();c
   node('path',{d:'M65 30V230H665',fill:'none',stroke:'#71857b'});node('line',{x1:65,x2:665,y1:y(truth),y2:y(truth),stroke:'#b26900','stroke-dasharray':'5 3'});for(const v of series){if(v.lower!=null)node('line',{x1:x(v.trial_index),x2:x(v.trial_index),y1:y(v.lower),y2:y(v.upper),stroke:v.inclusion?'#28776a':'#b94026'});node('circle',{cx:x(v.trial_index),cy:y(v.center),r:3,fill:'#222'});}node('text',{x:5,y:35,'font-size':12},fmt(hi));node('text',{x:5,y:230,'font-size':12},fmt(lo));node('text',{x:70,y:265,'font-size':12},'Original trial index · raw density intervals; red = excludes truth');}
 async function pixel(){if(!study)return;const sid=study.study_id,method=$('vl-method').value,n=study.plan.geometry.resolution,index=num('vl-row')*n+num('vl-col'),token=++pixelSerial;const p=await api(`/api/validation-studies/${sid}/pixels/${index}`);if(token!==pixelSerial||study?.study_id!==sid||$('vl-method').value!==method)return;
   $('vl-pixel-info').textContent=JSON.stringify({study_id:sid,row:num('vl-row'),column:num('vl-col'),index,spatial_center:[-1+(num('vl-col')+.5)*2/n,1-(num('vl-row')+.5)*2/n],truth:p.truth,conditioning:p.conditioning,...p.methods[method]},null,2);plotSeries(p.methods[method],p.truth);histogram('vl-pixel-hist',p.methods[method].series?.map(v=>v.center),'Reconstructed density across retained trials · orange = truth',p.truth);for(const marker of document.querySelectorAll('.vl-marker')){const n=Number(marker.dataset.n);Object.assign(marker.style,{width:100/n+'%',height:100/n+'%',left:100*num('vl-col')/n+'%',top:100*num('vl-row')/n+'%'});} $('vl-replay-pixel').disabled=!!p.methods[method].series;}
-$('vl-pixel').onclick=guard(pixel);$('vl-method').onchange=guard(async()=>{render();await pixel();});$('vl-map-choice').onchange=render;
+$('vl-pixel').onclick=guard(pixel);$('vl-method').onchange=guard(async()=>{render();await loadMain();await pixel();});$('vl-map-choice').onchange=render;
 $('vl-ledger').onclick=guard(async()=>{if(!study)throw Error('Select a study.');const sid=study.study_id,res=await api(`/api/validation-studies/${sid}/trials?offset=${num('vl-ledger-offset')}`);if(study?.study_id===sid)$('vl-ledger-info').textContent=JSON.stringify(res,null,2);});
 $('vl-show-trial').onclick=guard(async()=>{if(!study)return;const sid=study.study_id,t=await api(`/api/validation-studies/${sid}/representatives/${$('vl-representative').value}`);if(study?.study_id!==sid)return;$('vl-trial-info').textContent=JSON.stringify({trial:t.trial_index,method:t.method,k:t.k,bias_allowance:t.bias_allowance},null,2);$('vl-trial-map').replaceChildren();for(const key of ['center','half_width','lower','upper'])map($('vl-trial-map'),t[key],`Representative ${key}`,key);});
 $('vl-grid-review').onclick=guard(async()=>{const b=request();delete b.request_id;b.request_id='grid-base';const data={request_id:uid(),base:b,axis:$('vl-axis').value,values:csv('vl-values')};const r=await api('/api/parameter-studies/preflight',data);reviewedGrid={...data,accepted_hash:r.accepted_hash};$('vl-grid-info').textContent=JSON.stringify(r,null,2);$('vl-grid-run').disabled=false;});
@@ -76,3 +78,38 @@ function histogram(id,values,label,truth=null){
   if(truth!=null)add('line',{x1:60+600*(truth-lo)/(hi-lo),x2:60+600*(truth-lo)/(hi-lo),y1:25,y2:195,stroke:'#b26900','stroke-width':2});
   add('text',{x:10,y:35,'font-size':12},String(top));add('text',{x:60,y:212,'font-size':12},fmt(lo));add('text',{x:610,y:212,'font-size':12},fmt(hi));add('text',{x:60,y:235,'font-size':12},label+' · count '+values.length);
 }
+
+async function loadMain(){
+  if(!study)return;const sid=study.study_id,method=$('vl-method').value,token=++mainSerial;
+  const reps=study.representatives.filter(t=>t.method===method);
+  options('vl-main-trial',reps.map(t=>({...t,key:t.trial_index+'_'+t.method})),'key',t=>`Trial ${t.trial_index} · K ${t.k}`);
+  mainTrial=null;renderMain();if(!reps.length)return;
+  const trial=await api(`/api/validation-studies/${sid}/representatives/${$('vl-main-trial').value}`);
+  if(token!==mainSerial||study?.study_id!==sid||$('vl-method').value!==method)return;
+  mainTrial=trial;renderMain();
+}
+function mainImage(id,values,n,mask=null,row=null,a=null,b=null){
+  const parent=$(id);parent.replaceChildren();if(!values){parent.textContent='Unavailable for this study. Retain a representative trial to display a reconstruction and its intervals.';return;}
+  const small=document.createElement('canvas');small.width=small.height=n;
+  const bytes=mapBytes(values,[0,1]);if(mask)mask.forEach((inside,i)=>{if(!inside){bytes[i*4]=bytes[i*4+1]=bytes[i*4+2]=230;}});
+  small.getContext('2d').putImageData(new ImageData(bytes,n,n),0,0);
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=512;canvas.setAttribute('role','img');canvas.setAttribute('aria-label',mask?'Coverage from 0 (black) to 1 (white), masked outside the ellipse':'Selected trial reconstruction with selected row marked blue');
+  const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;ctx.drawImage(small,0,0,512,512);
+  ctx.strokeStyle='#2878b8';ctx.lineWidth=2;
+  if(mask){ctx.beginPath();ctx.ellipse(256,256,256*a,256*b,0,0,2*Math.PI);ctx.stroke();}
+  if(row!==null){ctx.beginPath();ctx.moveTo(0,(row+.5)*512/n);ctx.lineTo(512,(row+.5)*512/n);ctx.stroke();canvas.onclick=e=>{const bounds=canvas.getBoundingClientRect();$('vl-main-row').value=Math.min(n-1,Math.max(0,Math.floor((e.clientY-bounds.top)*n/bounds.height)));renderMain();};}
+  parent.append(canvas);
+}
+function renderMain(){
+  if(!study)return;const n=study.plan.geometry.resolution,method=$('vl-method').value,maps=study.maps[method],summary=study.summaries[method];
+  const row=num('vl-main-row');if(!Number.isInteger(row)||row<0||row>=n)throw Error(`Choose a row from 0 to ${n-1}.`);
+  const a=num('vl-ellipse-x'),b=num('vl-ellipse-y'),region=ellipseCoverage(maps.coverage,n,a,b);
+  mainImage('vl-main-reconstruction',mainTrial?.center,n,null,row);
+  mainImage('vl-main-coverage',maps.coverage,n,region.mask,null,a,b);
+  $('vl-ellipse-summary').textContent=`Mean coverage inside ellipse: ${region.mean===null?'unavailable':(100*region.mean).toFixed(2)+'%'}. ${region.count} of ${n*n} pixel centers; ${summary.returned_intervals}/${summary.planned} trials returned intervals. Nominal target: ${((1-study.configuration.alpha)*100).toFixed(1)}%. Scale: black = 0%, white = 100%; outside = gray. This is mean marginal coverage, not simultaneous coverage.`;
+  $('vl-main-context').textContent=`${study.plan.protocol} · ${study.plan.comparison} · ${study.completed_trials}/${study.plan.trials} trials · rank ${study.configuration.rank??'full'} · noise SD ${study.configuration.sigma}. ${mainTrial?`Displayed trial ${mainTrial.trial_index}, K = ${mainTrial.k}.`:'No representative trial retained for this method.'} Empirical validation; theoretical conditions are not established.`;
+  rowPlot($('vl-row-plot'),study.truth,maps.mean,mainTrial,n,row);
+  $('vl-row-caption').textContent=mainTrial?`Black: frozen truth. Red: empirical Landweber mean across ${summary.numeric_centers} reconstructions. Dashed gray: trial ${mainTrial.trial_index} reconstruction. Gray band: that trial’s raw nominal ${((1-study.configuration.alpha)*100).toFixed(1)}% intervals, centered on its reconstruction—not on the red mean. ${mainTrial.lower?'Endpoints are not clipped.':'Intervals unavailable for this trial.'}`:'Retain a representative trial when running validation to display its row intervals. The empirical mean alone does not define a confidence band.';
+}
+$('vl-main-trial').onchange=guard(loadMain);
+for(const id of ['vl-main-row','vl-ellipse-x','vl-ellipse-y'])$(id).onchange=guard(renderMain);

@@ -54,7 +54,7 @@
   <p id="rq-error" role="alert"></p><p id="rq-status" role="status">No randomized analysis selected.</p>
   <div class="settings"><label>Saved randomized analysis<select id="rq-analyses"><option value="">Select a result</option></select></label><button id="rq-refresh">Refresh records</button></div>
 </section>
-<section id="rq-results" hidden>
+<section id="rq-results" hidden><details><summary>Optional randomized-analysis maps &amp; diagnostics</summary>
   <section class="panel">
     <h3>Captured comparison</h3><p id="rq-summary"></p><p id="rq-mismatch" class="hint"></p>
     <p id="rq-interpretation" class="uq-notice"></p><p id="rq-reference-status"></p>
@@ -90,4 +90,4 @@
     <div class="settings"><label>Budget<input id="rq-own-budget" type="number" min="1" max="5000" value="1000"></label><label>Exact balance c₀<input id="rq-own-c0" type="number" min="0" step="any" value="1"></label><label>Exact bias policy<select id="rq-own-bound"><option value="spectral">Spectral</option><option value="global">Exact-half global</option><option value="safe_global">Safe-half global</option></select></label><button id="rq-own">Compare stopping points</button></div>
     <p id="rq-own-summary"></p><div id="rq-own-maps" class="uq-grid"></div><pre id="rq-own-pixel"></pre><pre id="rq-own-info"></pre>
   </section>
-</section>
+</details></section>

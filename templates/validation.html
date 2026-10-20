@@ -38,15 +38,22 @@
     <button id="vl-grid-export" disabled>Export complete parameter study</button><pre id="vl-grid-info"></pre><div id="vl-grid-links"></div>
   </details>
   <section class="panel"><h3>Captured studies</h3><label>Study<select id="vl-studies"><option value="">No study selected</option></select></label>
-    <div id="vl-results" hidden><p id="vl-interpretation"></p><div id="vl-table" class="vl-table"></div>
-      <div class="settings"><label>Method<select id="vl-method"></select></label><label>Additional map<select id="vl-map-choice"></select></label><label>Row<input id="vl-row" type="number" min="0" value="0"></label><label>Column<input id="vl-col" type="number" min="0" value="0"></label><button id="vl-pixel">Inspect pixel</button></div>
+    <div id="vl-results" hidden>
+      <div class="settings"><label>Method<select id="vl-method"></select></label><label>Displayed trial<select id="vl-main-trial"></select></label><label>Horizontal row (zero-based)<input id="vl-main-row" type="number" min="0" value="0"></label></div>
+      <p id="vl-main-context"></p>
+      <div class="vl-main-images"><section class="panel"><h3>1. Reconstructed image</h3><div id="vl-main-reconstruction"></div><p class="hint">Selected trial; blue line marks the plotted row. Display scale 0–1; raw values are preserved in the row plot.</p></section>
+      <section class="panel"><h3>2. Confidence intervals along the selected row</h3><svg id="vl-row-plot" viewBox="0 0 800 300" role="img" aria-label="Density against column: truth, empirical Landweber mean and selected trial confidence band"></svg><p id="vl-row-caption"></p></section>
+      <section class="panel"><h3>3. Empirical coverage inside ellipse</h3><div id="vl-main-coverage"></div><p id="vl-ellipse-summary" aria-live="polite"></p>
+      <details><summary>Coverage region</summary><div class="settings"><label>Horizontal radius (fraction of image half-width)<input id="vl-ellipse-x" type="number" min="0.01" max="1" step="0.05" value="0.9"></label><label>Vertical radius (fraction of image half-height)<input id="vl-ellipse-y" type="number" min="0.01" max="1" step="0.05" value="0.9"></label></div><p class="hint">Centered at the image center. Includes pixel centers satisfying (x/a)² + (y/b)² ≤ 1 in coordinates −1 to 1. Outside pixels are masked, not counted as zero coverage. This is an exploratory display region, not a fitted object mask or the paper’s specified ellipse.</p></details></section></div>
+      <details id="vl-result-diagnostics"><summary>Optional diagnostics, numerical maps &amp; trial records</summary><p id="vl-interpretation"></p><div id="vl-table" class="vl-table"></div>
+      <div class="settings"><label>Additional map<select id="vl-map-choice"></select></label><label>Row<input id="vl-row" type="number" min="0" value="0"></label><label>Column<input id="vl-col" type="number" min="0" value="0"></label><button id="vl-pixel">Inspect pixel</button></div>
       <div id="vl-maps" class="uq-grid"></div><svg id="vl-coverage-hist" viewBox="0 0 720 240" role="img" aria-label="Distribution of coverage estimates across correlated pixels"></svg><pre id="vl-pixel-info"></pre><svg id="vl-pixel-hist" viewBox="0 0 720 240" role="img" aria-label="Selected pixel empirical reconstruction distribution"></svg><svg id="vl-series" viewBox="0 0 720 280" role="img" aria-label="Selected pixel raw trial intervals"></svg><button id="vl-replay-pixel">Replay unretained pixel distribution</button>
       <details><summary>Counts, selection distribution, timing & diagnostics</summary><pre id="vl-summary"></pre><pre id="vl-bias-curve"></pre></details>
       <details><summary>Trial ledger</summary><div class="settings"><label>Offset<input id="vl-ledger-offset" type="number" min="0" value="0"></label><button id="vl-ledger">Load 100 trial/method records</button></div><pre id="vl-ledger-info"></pre></details>
       <details><summary>Representative numerical trial</summary><div class="settings"><label>Retained representative<select id="vl-representative"></select></label><button id="vl-show-trial">Inspect retained trial</button></div><pre id="vl-trial-info"></pre><div id="vl-trial-map" class="uq-grid"></div></details>
-    </div>
+    </details></div>
   </section>
-  <details class="panel" open><summary>Artifacts & replay</summary>
+  <details class="panel"><summary>Artifacts & replay</summary>
     <p>Numerical bundles preserve arrays, settings and the trial schedule. Figure packs contain PNGs and source CSVs; they are not complete replay bundles. Restore does not change the drawing.</p>
     <div class="settings"><button id="vl-export">Export numerical bundle</button><button id="vl-figures">Export figure pack</button><label>Restore numerical bundle<input id="vl-import-file" type="file" accept=".zip,application/zip"></label><button id="vl-import">Restore for inspection</button></div>
     <div class="settings"><label>Original trial index<input id="vl-replay-trial-index" type="number" min="0" value="0"></label><button id="vl-replay-trial">Replay selected trial</button><button id="vl-export-trial">Export selected retained trial</button><button id="vl-replay-study">Rerun recorded study schedule</button></div>

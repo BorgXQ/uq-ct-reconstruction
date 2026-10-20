@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/editor.test.mjs && node tests/ct-view.test.mjs && node tests/exact-view.test.mjs",
+    "test": "node tests/editor.test.mjs && node tests/ct-view.test.mjs && node tests/exact-view.test.mjs && node tests/validation-presentation.test.mjs",
     "test:browser": "node scripts/check-browser.mjs",
     "test:browser:m2": "node scripts/check-m2-browser.mjs",
     "test:browser:m3": "node scripts/check-m3-browser.mjs",

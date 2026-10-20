@@ -10,7 +10,7 @@ async function terminal(id){for(let i=0;i<6000;i++){const j=await get('/api/jobs
 async function job(path,body){const j=await post(path,body),done=await terminal(j.job_id);assert.equal(done.status,'completed',JSON.stringify(done));return done.result;}
 const field=async(id,value)=>page.fill('#'+id,String(value));
 async function action(id,path){const wait=page.waitForResponse(r=>r.url().endsWith(path)&&r.request().method()==='POST');await page.click('#'+id);const r=await(await wait).json();assert.ok(r.job_id,JSON.stringify(r));const done=await terminal(r.job_id);assert.equal(done.status,'completed',JSON.stringify(done));return done.result;}
-async function run(path){const refs=await action('rq-submit',path);await page.waitForFunction(id=>document.querySelector('#rq-analyses').value===id&&!document.querySelector('#rq-results').hidden,refs.analysis_id);return get('/api/randomized-analyses/'+refs.analysis_id);}
+async function run(path){const refs=await action('rq-submit',path);await page.waitForFunction(id=>document.querySelector('#rq-analyses').value===id&&!document.querySelector('#rq-results').hidden,refs.analysis_id);if(!await page.locator('#rq-results > details').evaluate(el=>el.open))await page.locator('#rq-results > details > summary').click();return get('/api/randomized-analyses/'+refs.analysis_id);}
 try{
   // Actual image bytes, not a mock output; M1–M3 browser suites cover drawing gestures separately.
   const raw=Buffer.alloc(512*512);for(let y=70;y<250;y++)for(let x=90;x<280;x++)raw[y*512+x]=192;

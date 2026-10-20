@@ -19,6 +19,19 @@ try{
  await page.fill('#vl-trials','6');await page.fill('#vl-k','10');await page.check('[name="vl-method"][value="exact"]');await page.check('[name="vl-method"][value="retained"]');
  await page.click('#vl-preflight');await page.waitForFunction(()=>document.querySelector('#vl-preflight-info').textContent.includes('workspace_bytes'));
  const fixed=await action('vl-run','/api/validation-studies');await page.waitForFunction(s=>document.querySelector('#vl-studies').value===s&&!document.querySelector('#vl-results').hidden,fixed.study_id);
+ await page.waitForSelector('#vl-row-plot [data-role=interval-band]');
+ assert.equal(await page.locator('#vl-result-diagnostics').getAttribute('open'),null);
+ assert.equal(await page.locator('#vl-main-reconstruction canvas').count(),1);
+ assert.match(await page.locator('#vl-ellipse-summary').innerText(),/Mean coverage inside ellipse/);
+ await page.fill('#vl-main-row','7');await page.locator('#vl-main-row').press('Tab');
+ assert.match(await page.locator('#vl-row-plot').textContent(),/row 7/);
+ await page.getByText('Coverage region',{exact:true}).click();
+ await page.fill('#vl-ellipse-x','0.5');await page.locator('#vl-ellipse-x').press('Tab');
+ const result=await get('/api/validation-studies/'+fixed.study_id+'?arrays=1');
+ const {ellipseCoverage}=await import('../static/validation-presentation.js');
+ const expected=ellipseCoverage(result.maps.corrected.coverage,16,.5,.9);
+ assert.match(await page.locator('#vl-ellipse-summary').innerText(),new RegExp((100*expected.mean).toFixed(2)+'%'));
+ await page.locator('#vl-result-diagnostics > summary').click();
  assert.match(await page.locator('#vl-interpretation').innerText(),/6\/6/);assert.equal(await page.locator('#vl-maps canvas').count(),5);
  await page.fill('#vl-col','3');await page.click('#vl-pixel');await page.waitForFunction(()=>document.querySelector('#vl-pixel-info').textContent.includes('Not retained'));
  await page.locator('#vl-maps canvas').first().focus();await page.keyboard.press('ArrowRight');assert.equal(await page.inputValue('#vl-col'),'4');
@@ -28,6 +41,7 @@ try{
  await page.selectOption('#vl-comparison','common_k');await page.fill('#vl-trials','2');await page.getByText('Parameter studies',{exact:true}).click();await page.fill('#vl-values','2,4');
  await page.click('#vl-grid-review');await page.waitForFunction(()=>!document.querySelector('#vl-grid-run').disabled);await action('vl-grid-run','/api/parameter-studies');await page.waitForFunction(()=>document.querySelector('#vl-grid-links').children.length===2);
  await page.selectOption('#vl-studies',fixed.study_id);await page.waitForFunction(()=>document.querySelector('#vl-interpretation').textContent.includes('6/6'));
+ await page.getByText('Artifacts & replay',{exact:true}).click();
  const exported=await action('vl-export','/api/exports');const rawBundle=await(await page.request.get(base+exported.download)).body();await writeFile('/tmp/ct-m5-browser.zip',rawBundle);
  await page.setInputFiles('#vl-import-file','/tmp/ct-m5-browser.zip');const restored=await action('vl-import','/api/imports');await page.waitForFunction(s=>document.querySelector('#vl-studies').value===s,restored.study_id);
  const replay=await action('vl-replay-trial',`/api/validation-studies/${restored.study_id}/inspection-requests`);assert.equal(replay.status,'agreement');

@@ -1,4 +1,4 @@
-import {RasterHistory, floodFill, squareBounds} from './editor-core.js';
+import {RasterHistory, floodFill} from './editor-core.js';
 
 export function paintRaster(canvas, pixels, side) {
   canvas.width = side; canvas.height = side;
@@ -50,16 +50,10 @@ export class Editor {
       } else {
         ctx.moveTo(first.x, first.y); g.points.slice(1).forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
       }
-    } else {
-      if (g.tool === 'circle') {
+    } else if (g.tool === 'circle') {
         const radius = Math.hypot(last.x - first.x, last.y - first.y);
         if (!radius) return;
         ctx.arc(first.x, first.y, radius, 0, Math.PI*2);
-      } else {
-        const b = squareBounds(first, last); if (!b.side) return;
-        ctx.lineJoin = 'miter';
-        ctx.rect(b.x, b.y, b.side, b.side);
-      }
       if (g.mode === 'filled') ctx.fill(); else ctx.stroke();
     }
   }

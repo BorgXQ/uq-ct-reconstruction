@@ -120,7 +120,7 @@ $('freeze').onclick = async () => {
   } catch(error) { $('freeze-status').textContent = 'Freeze failed. Previous snapshots preserved; use Freeze image to retry.'; report(error.message); }
   finally { freezing = false; controls(); }
 };
-const hints = {brush:'Drag to paint. Click for a round dab. Escape cancels a gesture.', eraser:'Paints black with the selected thickness. Your painting shade is preserved.', circle:'Press at the center, then drag outward to set the radius. Escape cancels.', square:'Press at one corner and drag to size an equal-sided square. Escape cancels.'};
+const hints = {brush:'Drag to paint. Click for a round dab. Escape cancels a gesture.', eraser:'Paints black with the selected thickness. Your painting shade is preserved.', circle:'Press at the center, then drag outward to set the radius. Escape cancels.'};
 document.querySelectorAll('[data-tool]').forEach(button => button.onclick = () => {
   if(busy) return;
   editor.settings.tool = button.dataset.tool;

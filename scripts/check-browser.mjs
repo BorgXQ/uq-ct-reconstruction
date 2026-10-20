@@ -56,9 +56,8 @@ try {
   assert.equal((await pixel(130,130))[0],192);
   for(const [x,y] of [[180,130],[80,130],[130,80],[130,180]])assert.equal((await pixel(x,y))[0],192);
   for(const [x,y] of [[195,130],[130,195]])assert.equal((await pixel(x,y))[0],0);
-  await tool('square');await shade(64);await page.selectOption('#shape-mode','outline');await gesture(260,260,420,380);await draft();
+  await tool('circle');await shade(64);await page.selectOption('#shape-mode','outline');await gesture(340,340,420,340);await draft();
   assert.equal((await pixel(340,340))[0],0);assert.equal((await pixel(420,340))[0],64);
-  assert.equal((await pixel(254,254))[0],64); // Sharp outer square corner, not a rounded rectangle.
   await tool('brush');await shade(128);await gesture(340,340);await draft();
   assert.equal((await pixel(340,340))[0],128);assert.equal((await pixel(10,10))[0],0);
   const filled=await raster();await page.click('#undo');await draft();assert.equal((await pixel(340,340))[0],0);
@@ -89,16 +88,11 @@ try {
   await page.waitForFunction(id=>document.querySelector('#snapshots').value===id,first.snapshot_id);
   assert.deepEqual((await getSnapshot(first.snapshot_id)).pixels,stored.pixels);
   await page.screenshot({path:'/tmp/ct-m1-desktop.png',fullPage:true});
-  check('demonstration: circle 192, square outline 64, brush 128, stroke 137, fractional averages, two immutable snapshots, matching after undo');
+  check('demonstration: circle 192, circle outline 64, brush 128, stroke 137, fractional averages, two immutable snapshots, matching after undo');
 
   await page.click('#draft-tab');await clear();
-  await tool('square');await page.selectOption('#shape-mode','filled');await shade(192);
-  for(const [dx,dy] of [[40,20],[-40,20],[-20,-40],[20,-40]]) {
-    await clear();await gesture(256,256,256+dx,256+dy);await draft();
-    const x=dx<0?230:280,y=dy<0?230:280;assert.equal((await pixel(x,y))[0],192);
-    assert.equal((await pixel(dx<0?210:302,y))[0],0);
-  }
-  await clear();await tool('square');await page.selectOption('#shape-mode','filled');await shade(64);await gesture(1,1,511,511);await draft();
+  assert.deepEqual(await page.locator('[data-tool]').evaluateAll(buttons=>buttons.map(b=>b.dataset.tool)),['brush','eraser','circle']);
+  await tool('circle');await page.selectOption('#shape-mode','filled');await shade(64);await gesture(256,256,511,511);await draft();
   await tool('circle');await shade(192);await page.selectOption('#shape-mode','outline');await gesture(256,256,300,256);await draft();
   assert.equal((await pixel(256,256))[0],64);assert.equal((await pixel(300,256))[0],192);
   await page.selectOption('#shape-mode','filled');await gesture(256,256,290,256);await draft();assert.equal((await pixel(256,256))[0],192);
@@ -115,7 +109,7 @@ try {
   await page.keyboard.press('Escape');await page.mouse.up();assert.deepEqual(await raster(),beforeCancel);assert.equal(await page.locator('#revision').textContent(),rev);
   await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move(p2.x,p2.y);
   await page.locator('#editor').dispatchEvent('pointercancel',{pointerId:1});await page.mouse.up();assert.deepEqual(await raster(),beforeCancel);
-  check('square quadrants, filled/outline semantics, Escape and pointer cancellation, gesture locking');
+  check('three drawing tools, circle filled/outline semantics, Escape and pointer cancellation, gesture locking');
 
   await page.setViewportSize({width:540,height:1050});await clear();await tool('circle');await shade(137);await gesture(256,256,306,256);await draft();
   assert.equal((await pixel(256,300))[0],137);assert.equal((await pixel(300,256))[0],137);

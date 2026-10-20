@@ -40,11 +40,6 @@ export class RasterHistory {
   }
 }
 
-export function squareBounds(start, end) {
-  const dx = end.x - start.x, dy = end.y - start.y, side = Math.max(Math.abs(dx), Math.abs(dy));
-  return {x: dx < 0 ? start.x - side : start.x, y: dy < 0 ? start.y - side : start.y, side};
-}
-
 export function base64(bytes) {
   let binary = '';
   for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {floodFill, RasterHistory, squareBounds, base64} from '../static/editor-core.js';
+import {floodFill, RasterHistory, base64} from '../static/editor-core.js';
 
 test('four-connected fill leaves disconnected and diagonal regions untouched', () => {
   const source=Uint8Array.from([0,9,0,9,0,9,0,9,0]);
@@ -37,12 +37,6 @@ test('history bounds, clear, redo branching, defensive commit', () => {
   for(let i=0;i<60;i++)h.redo();assert.equal(h.pixels[0],60);
   h.commit(new Uint8Array(4));h.undo();assert.equal(h.pixels[0],60);h.redo();assert.equal(h.pixels[0],0);
   h.undo();const a=new Uint8Array(4).fill(80);h.commit(a);a[0]=9;assert.equal(h.pixels[0],80);assert.equal(h.redo(),false);
-});
-test('square geometry in every quadrant and zero displacement convention', () => {
-  for(const [x,y] of [[4,2],[-4,2],[-2,-4],[2,-4],[0,4]]) {
-    const b=squareBounds({x:10,y:10},{x:10+x,y:10+y});assert.equal(b.side,4);
-    assert.equal(b.x,x<0?6:10);assert.equal(b.y,y<0?6:10);
-  }
 });
 test('byte serialization preserves the entire raster', () => {
   const bytes=Uint8Array.from({length:512*512},(_,i)=>i%256);

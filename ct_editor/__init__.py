@@ -13,6 +13,9 @@ from .exact.service import ExactService
 from .exact.routes import routes as exact_routes
 from .randomized.service import RandomizedService
 from .randomized.routes import routes as randomized_routes
+from .validation.service import ValidationService
+from .validation.artifacts import Artifacts
+from .validation.routes import routes as validation_routes
 
 
 def create_app(config=None):
@@ -33,6 +36,11 @@ def create_app(config=None):
     randomized = RandomizedService(exact, app.config)
     app.extensions['randomized_service'] = randomized
     app.register_blueprint(randomized_routes(randomized))
+    validation = ValidationService(randomized, app.config)
+    artifacts = Artifacts(validation)
+    app.extensions['validation_service'] = validation
+    app.extensions['validation_artifacts'] = artifacts
+    app.register_blueprint(validation_routes(validation, artifacts))
 
     @app.get("/")
     def index():
@@ -40,7 +48,7 @@ def create_app(config=None):
 
     @app.get("/api/health")
     def health():
-        return jsonify(status="ready", milestone="M4")
+        return jsonify(status="ready", milestone="M5")
 
     def capture():
         if not request.is_json:

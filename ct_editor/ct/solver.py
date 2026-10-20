@@ -50,7 +50,7 @@ def validate_step(operator, omega, certificate=None):
         raise InputError('Step is unstable or too close to the numerical stability boundary.',code='invalid_step',status=422)
 
 
-def landweber(operator, y, omega, iterations, cancel=lambda:False, emit=lambda *args:None, *, step_certificate=None):
+def landweber(operator, y, omega, iterations, cancel=lambda:False, emit=lambda *args:None, *, step_certificate=None, retain_history=True):
     integer(iterations,'iterations',1,5000)
     y=frozen_array(y)
     if y.shape!=(operator.shape[0],): raise InputError('Observation shape mismatch.',code='incompatible_dimensions')
@@ -58,6 +58,8 @@ def landweber(operator, y, omega, iterations, cancel=lambda:False, emit=lambda *
     x=np.zeros(operator.shape[1],np.float64);residual=y.copy();ynorm=float(np.linalg.norm(y));start=perf_counter()
     stride=max(1,math.ceil(iterations/100));checkpoints={};history=[];k=0
     def record():
+        if not retain_history:
+            return
         norm=float(np.linalg.norm(residual));objective=.5*norm*norm
         if not np.isfinite(norm) or not np.isfinite(objective): raise InputError('Nonfinite reconstruction metric.',code='nonfinite_calculation',status=422)
         history.append(dict(iteration=k,residual_norm=norm,objective=objective,relative_residual=norm/ynorm if ynorm else None,

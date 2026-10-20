@@ -65,10 +65,15 @@ class NormalAction:
         return out
 
 
-def gaussian_factors(op,r,p,seed,block=8,check=lambda:None,progress=lambda *a:None):
+def gaussian_factors(op,r,p,seed,block=8,check=lambda:None,progress=lambda *a:None, *, seed_entropy=None):
     n=op.shape[1];integer(r,'rank',1,min(n,512));integer(p,'oversampling',4,64)
     if r+p>n: raise InputError('Require rank + oversampling ≤ image dimension.','rank')
     integer(seed,'sketch_seed',0,2**32-1);integer(block,'block_size',1,64)
+    if seed_entropy is not None:
+        if not isinstance(seed_entropy,list) or len(seed_entropy)!=4:
+            raise InputError('Expected four validation seed words.')
+        for word in seed_entropy: integer(word,'seed word',0,2**32-1)
+        seed=seed_entropy
     started=perf_counter();normal=NormalAction(op,check);ell=r+p
     Y=np.empty((n,ell))
     for start in range(0,ell,block):
@@ -249,7 +254,7 @@ def probability(config,factors,k):
         settings_origin=config['settings_origin'],numerical_status='checked',
         coverage_interpretation='Exploratory corrected formula — probability conditions not established',
         unmet_conditions=['Source condition and both Assumption 3.9 inequalities require justification.',
-            'Complete beta definition and hypotheses are unavailable.',
+            'Quantitative beta calculation and hypothesis checks are not implemented.',
             'No validated conditional relative-error probe-count procedure is supplied.',
             'Same-probe stopping requires selected-iteration control; fixed-k control is insufficient.' if scope.startswith('selected') else 'Observed probe accuracy is not a concentration certificate.',
             'Settings independence from measurement noise is declared or unknown, not proven.'],
@@ -259,4 +264,4 @@ def probability(config,factors,k):
             provider=None,control_established=False,reason='Applicable conditional concentration procedure unavailable.'),
         appendix=dict(status='spectral_threshold_unavailable',beta=None,rho=None,
             rho_status='full_lower_spectrum_unavailable',approximate_complement_norm=1,
-            reason='β and its hypotheses are not supplied. Stable full steps alone do not establish ρ < 1.'))
+            reason='Quantitative β certification is not implemented. Stable full steps alone do not establish ρ < 1.'))

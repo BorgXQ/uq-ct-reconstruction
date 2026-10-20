@@ -5,8 +5,6 @@
   "scripts": {
     "test": "node tests/editor.test.mjs && node tests/ct-view.test.mjs && node tests/exact-view.test.mjs && node tests/validation-presentation.test.mjs",
     "test:browser": "node scripts/check-browser.mjs",
-    "test:browser:m4": "node scripts/check-m4-browser.mjs",
-    "test:browser:m5": "node scripts/check-m5-browser.mjs",
     "test:browser:m7": "node scripts/check-m7-browser.mjs",
     "vendor:plotly": "node scripts/vendor-plotly.mjs"
   },

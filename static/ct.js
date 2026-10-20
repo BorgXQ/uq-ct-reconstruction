@@ -44,7 +44,7 @@ function selectSource(id,resetDetector=true){
   const source=snapshots.find(s=>s.snapshot_id===id);
   $('measure-snapshot').value=source?id:'';measureGeneration++;
   if(source){
-    if(resetDetector)$('n-detectors').value=Math.ceil(Math.sqrt(2)*source.resolution)+1;
+    if(resetDetector)$('n-detectors').value=2*(Math.ceil(Math.sqrt(2)*Math.floor(source.resolution/2))+1)+1;
     $('source-context').textContent=`Selected frozen image ${source.snapshot_id} · ${source.resolution} × ${source.resolution} · content ${source.content_hash}`;
   }else $('source-context').textContent='Select a frozen image. Historical images remain valid acquisition inputs.';
   availability();scanMismatch();
@@ -109,7 +109,7 @@ function renderScan(){
   $('scan-results').hidden=false;paintRaster($('scan-truth'),Uint8Array.from(truth.pixels,x=>Math.round(255*x)),truth.resolution);
   drawSinogram($('clean-sinogram'),a.y_clean,na,nd,range);drawSinogram($('observed-sinogram'),o.y,na,nd,range);
   $('observed-title').textContent=o.noise.sigma===0?'Observed sinogram — no added noise':'Observed sinogram — Gaussian noise';
-  document.querySelectorAll('.sinogram-axes').forEach(el=>el.textContent=`Horizontal: normal angle ${(a.geometry.angles[0]*180/Math.PI).toFixed(2)}° → ${(a.geometry.angles.at(-1)*180/Math.PI).toFixed(2)}° (actual samples). Vertical: offset ${a.geometry.offsets[0].toFixed(4)} bottom → ${a.geometry.offsets.at(-1).toFixed(4)} top.`);
+  document.querySelectorAll('.sinogram-axes').forEach(el=>el.textContent=`Horizontal: normal angle ${(a.geometry.angles[0]*180/Math.PI).toFixed(2)}° → ${(a.geometry.angles.at(-1)*180/Math.PI).toFixed(2)}° (actual samples). Vertical: offset ${a.geometry.offsets[0].toFixed(4)} bottom → ${a.geometry.offsets.at(-1).toFixed(4)} top (pixel units).`);
   $('scan-source').textContent=`Snapshot ${a.snapshot_id} · ${a.resolution} × ${a.resolution}`;
   $('scan-summary').textContent=`${na} angles × ${nd} offsets = ${na*nd} measurements · ${a.operator.nnz} sparse weights · σ ${o.noise.sigma}, seed ${o.noise.seed} · operator ${a.operator_cache_hit?'reused':'built'} · clean measurements ${a.clean_cache_hit?'reused':'computed'} · ${a.elapsed_seconds.toFixed(3)} s acquisition`;
   scanMismatch();

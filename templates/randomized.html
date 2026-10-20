@@ -59,8 +59,8 @@
 <section id="rq-results" hidden>
 <section class="panel" id="rq-primary"><h2>Reconstruction</h2><p id="rq-primary-context"></p><p id="rq-mismatch" class="hint"></p><p id="rq-primary-status" role="status"></p>
 <div class="settings"><label>Horizontal row (zero-based)<input id="rq-main-row" type="number" min="0" value="0"></label></div>
-<div class="rq-primary-grid"><div><canvas id="rq-main-image" width="512" height="512" role="img" aria-label="Landweber reconstruction with selected row marked"></canvas><p class="hint">Image display scale 0–1. Blue line marks the selected row.</p></div>
-<div><h3>Confidence intervals along the selected row</h3><svg id="rq-row-plot" viewBox="0 0 800 300" role="img" aria-label="Truth in black, selected reconstruction in red, confidence band in gray"></svg><p id="rq-row-caption"></p></div></div>
+<div class="rq-primary-grid"><div class="reconstruction-plot-card"><h3>Reconstructed image</h3><div class="image-with-scale"><canvas id="rq-main-image" width="512" height="512" role="img" aria-label="Landweber reconstruction with selected row marked blue"></canvas>{% include 'density-scale.html' %}</div></div>
+<div class="reconstruction-plot-card"><h3>Confidence intervals along the selected row</h3><div id="rq-row-plot" class="interval-chart" role="img" aria-label="Interactive density plot: truth, Landweber mean and confidence interval"></div></div></div>
 </section>
 <details><summary>Optional randomized-analysis maps &amp; diagnostics</summary>
   <section class="panel">

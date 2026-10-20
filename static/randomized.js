@@ -154,18 +154,22 @@ $('rq-analyses').onchange=guarded(()=>show($('rq-analyses').value));$('rq-refres
 $('rq-map-choice').onchange=()=>render();$('rq-pixel').onclick=pixel;$('rq-row').onchange=pixel;$('rq-col').onchange=pixel;
 
 function renderPrimary(){
-  const svg=$('rq-row-plot'),canvas=$('rq-main-image');svg.replaceChildren();canvas.hidden=!view?.center;
+  const svg=$('rq-row-plot'),canvas=$('rq-main-image');canvas.hidden=!view?.center;canvas.parentElement.querySelector('.density-scale').hidden=!view?.center;
   $('rq-main-row').disabled=!view?.center;
-  if(!view?.center){$('rq-primary-context').textContent=`No reconstruction selected: ${base?.status??'unavailable'}.`;$('rq-primary-status').textContent='Automatic stopping did not find a crossing within the search budget. No cap reconstruction or interval is substituted.';$('rq-row-caption').textContent='';return;}
+  if(!view?.center){rowPlot(svg,null,null,0,0);$('rq-primary-context').textContent=`No reconstruction selected: ${base?.status??'unavailable'}.`;$('rq-primary-status').textContent='Automatic stopping did not find a crossing within the search budget. No cap reconstruction or interval is substituted.';return;}
   const n=view.shape[0],row=num('rq-main-row');if(!Number.isInteger(row)||row<0||row>=n)throw Error(`Choose a row from 0 to ${n-1}.`);
   const small=document.createElement('canvas');small.width=small.height=n;small.getContext('2d').putImageData(new ImageData(mapBytes(view.center,[0,1]),n,n),0,0);
   const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;ctx.clearRect(0,0,512,512);ctx.drawImage(small,0,0,512,512);ctx.strokeStyle='#2878b8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,(row+.5)*512/n);ctx.lineTo(512,(row+.5)*512/n);ctx.stroke();
-  rowPlot(svg,truth,view,n,row);
+  svg.style.height=canvas.getBoundingClientRect().height+'px';
+  rowPlot(svg,truth,view,n,row,view.configuration.alpha);
   $('rq-primary-context').textContent=`Observation ${base.observation_id.slice(0,8)} · actual K = ${view.iteration} · selected K = ${base.selected_k} · rank ${base.configuration.rank} · noise SD ${base.configuration.sigma}. ${view.iteration!==base.selected_k?'Exploratory iteration inspection.':''}`;
   $('rq-primary-status').textContent=view.intervals_available?view.coverage_interpretation:`Confidence intervals unavailable: ${view.intervals_unavailable_reason||'declare justified source parameters and omitted-bias allowance'}.`;
-  $('rq-row-caption').textContent=`Black: frozen truth (validation reference). Red: this observation’s Landweber reconstruction, the fiducial mean. ${view.lower?'Gray band: its raw nominal '+((1-view.configuration.alpha)*100).toFixed(1)+'% intervals.':'No confidence band is available.'} Raw endpoints are not clipped. No repeated trials are used for this plot.`;
 }
 $('rq-main-row').onchange=guarded(renderPrimary);
 $('rq-main-image').onclick=guarded(e=>{if(!view?.center)return;const box=e.currentTarget.getBoundingClientRect();$('rq-main-row').value=Math.max(0,Math.min(view.shape[0]-1,Math.floor((e.clientY-box.top)*view.shape[0]/box.height)));renderPrimary();});
 $('rq-selected').onclick=guarded(()=>show(base.analysis_id,signature));
 controls();
+
+// Keep the chart dimensions aligned with the square image after layout changes.
+let primaryWidth=0;
+new ResizeObserver(entries=>{const width=entries[0].contentRect.width;if(width>0&&width!==primaryWidth){primaryWidth=width;if(view?.center)renderPrimary();}}).observe(document.querySelector('.rq-primary-grid'));

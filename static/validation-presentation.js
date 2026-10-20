@@ -5,16 +5,50 @@ export function ellipseCoverage(values,n,a,b){
   const selected=values?.filter((v,i)=>mask[i]&&Number.isFinite(v))??[];
   return {mask,count:mask.filter(Boolean).length,available:selected.length,mean:selected.length?selected.reduce((s,v)=>s+v,0)/selected.length:null};
 }
-export function rowPlot(svg,truth,trial,n,row){
-  svg.replaceChildren();if(!trial)return;
-  const ns='http://www.w3.org/2000/svg',start=row*n,cut=a=>a?.slice(start,start+n),t=cut(truth),low=cut(trial.lower),high=cut(trial.upper),center=cut(trial.center);
-  const values=[...t,...center,...(low??[]),...(high??[])].filter(Number.isFinite);
-  const min=Math.min(...values),max=Math.max(...values),pad=Math.max((max-min)*.08,.01),lo=min-pad,hi=max+pad;
-  const X=i=>70+690*i/(n-1),Y=v=>250-220*(v-lo)/(hi-lo);
-  const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);};
-  for(let j=0;j<=4;j++){const v=lo+(hi-lo)*j/4;add('line',{x1:70,x2:760,y1:Y(v),y2:Y(v),stroke:'#e0e3e1'});add('text',{x:4,y:Y(v)+4,'font-size':12},v.toFixed(3));}
-  if(low&&high)add('polygon',{points:[...high.map((v,i)=>`${X(i)},${Y(v)}`),...low.map((v,i)=>`${X(i)},${Y(v)}`).reverse()].join(' '),fill:'#aaa',opacity:.5,'data-role':'interval-band'});
-  for(const [a,color,dash,role] of [[t,'#111','','truth'],[center,'#c52b32','','trial-center']])if(a)add('polyline',{points:a.map((v,i)=>`${X(i)},${Y(v)}`).join(' '),fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':dash,'data-role':role});
-  for(const i of [0,Math.floor((n-1)/2),n-1])add('text',{x:X(i),y:270,'text-anchor':'middle','font-size':12},String(i));
-  add('text',{x:330,y:294,'font-size':13},`Column index · row ${row}`);add('text',{x:4,y:16,'font-size':12},'Density');
+// Pure Plotly specification: every trace uses raw values from the same row.
+export function rowFigure(truth,trial,n,row,alpha=.05){
+  const start=row*n,cut=a=>a?.slice(start,start+n),x=Array.from({length:n},(_,i)=>i);
+  const t=cut(truth),center=cut(trial.center),low=cut(trial.lower),high=cut(trial.upper);
+  const level=Number(((1-alpha)*100).toFixed(2)),data=[];
+  if(low&&high){
+    data.push({type:'scatter',mode:'lines',x,y:low,name:'Lower bound',showlegend:false,
+      legendgroup:'interval',line:{width:0,simplify:false},hoverinfo:'skip',meta:{role:'interval-lower'}});
+    data.push({type:'scatter',mode:'lines',x,y:high,name:`${level}% Confidence interval`,
+      legendgroup:'interval',legendrank:3,line:{width:0,color:'#a3a3a3',simplify:false},
+      fill:'tonexty',fillcolor:'rgba(150,150,150,0.30)',hoverinfo:'skip',meta:{role:'interval-upper'}});
+  }
+  if(t)data.push({type:'scatter',mode:'lines',x,y:t,name:'Truth',legendrank:1,
+    line:{color:'#111',width:2,simplify:false},meta:{role:'truth'},
+    hovertemplate:'Column %{x}<br>Density %{y:.5f}<extra>Truth</extra>'});
+  data.push({type:'scatter',mode:'lines',x,y:center,name:'Landweber mean',legendrank:2,
+    line:{color:'#c52b32',width:2,simplify:false},meta:{role:'trial-center'},
+    customdata:low&&high?low.map((v,i)=>[v,high[i]]):undefined,
+    hovertemplate:'Column %{x}<br>Density %{y:.5f}'+(low&&high?`<br>${level}% interval [%{customdata[0]:.5f}, %{customdata[1]:.5f}]`:'')+'<extra>Landweber mean</extra>'});
+  const values=[...(t??[]),...center,...(low??[]),...(high??[])].filter(Number.isFinite);
+  const min=Math.min(...values),max=Math.max(...values),pad=Math.max((max-min)*.08,.01);
+  return {data,layout:{
+    margin:{l:58,r:16,t:12,b:48},paper_bgcolor:'#fffef8',plot_bgcolor:'#fffef8',
+    font:{family:'system-ui, sans-serif',size:12,color:'#19312e'},
+    xaxis:{title:{text:`Column index · row ${row}`,standoff:8},range:[0,Math.max(1,n-1)],
+      dtick:n<=24?Math.max(1,Math.ceil(n/5)):undefined,showgrid:false,zeroline:false,
+      showline:true,linecolor:'#bdc7c1',ticks:'outside',tickcolor:'#bdc7c1'},
+    yaxis:{title:{text:'Density',standoff:8},range:[min-pad,max+pad],
+      gridcolor:'#e5e9e5',zeroline:false,nticks:5,automargin:true},
+    legend:{x:.99,y:.99,xanchor:'right',yanchor:'top',traceorder:'normal',
+      bgcolor:'rgba(255,254,248,0.94)',bordercolor:'#bdc7c1',borderwidth:1,font:{size:11}},
+    hovermode:'x unified',dragmode:'zoom',
+    uirevision:`${trial.analysis_id??trial.trial_index??''}:${trial.iteration??trial.k??''}:${row}`,
+    annotations:low&&high?[]:[{text:'Confidence interval unavailable',xref:'paper',yref:'paper',
+      x:0,y:1,showarrow:false,xanchor:'left',yanchor:'top',font:{size:11,color:'#60726c'}}],
+  }};
+}
+
+export function rowPlot(plot,truth,trial,n,row,alpha=.05){
+  if(!trial){globalThis.Plotly.purge(plot);plot.replaceChildren();return;}
+  const {data,layout}=rowFigure(truth,trial,n,row,alpha);
+  layout.width=plot.clientWidth||800;layout.height=plot.clientHeight||300;
+  // The mean is T_K y for this observation, not a repeated-trial average.
+  return globalThis.Plotly.react(plot,data,layout,{responsive:true,displaylogo:false,
+    scrollZoom:false,displayModeBar:'hover',modeBarButtonsToRemove:['select2d','lasso2d'],
+    toImageButtonOptions:{format:'png',filename:`confidence-interval-row-${row}`,scale:2}});
 }

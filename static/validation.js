@@ -108,8 +108,10 @@ function renderMain(){
   mainImage('vl-main-coverage',maps.coverage,n,region.mask,null,a,b);
   $('vl-ellipse-summary').textContent=`Mean coverage inside ellipse: ${region.mean===null?'unavailable':(100*region.mean).toFixed(2)+'%'}. ${region.count} of ${n*n} pixel centers; ${summary.returned_intervals}/${summary.planned} trials returned intervals. Nominal target: ${((1-study.configuration.alpha)*100).toFixed(1)}%. Scale: black = 0%, white = 100%; outside = gray. This is mean marginal coverage, not simultaneous coverage.`;
   $('vl-main-context').textContent=`${study.plan.protocol} · ${study.plan.comparison} · ${study.completed_trials}/${study.plan.trials} trials · rank ${study.configuration.rank??'full'} · noise SD ${study.configuration.sigma}. ${mainTrial?`Displayed trial ${mainTrial.trial_index}, K = ${mainTrial.k}.`:'No representative trial retained for this method.'} Empirical validation; theoretical conditions are not established.`;
-  rowPlot($('vl-row-plot'),study.truth,mainTrial,n,row);
-  $('vl-row-caption').textContent=mainTrial?`Black: frozen truth. Red: Landweber reconstruction from trial ${mainTrial.trial_index} (the fiducial mean for that observation). Gray band: that trial’s raw nominal ${((1-study.configuration.alpha)*100).toFixed(1)}% intervals, centered on the red reconstruction. ${mainTrial.lower?'Endpoints are not clipped.':'Intervals unavailable for this trial.'}`:'Retain a representative trial when running validation to display its row intervals.';
+  const image=$('vl-main-reconstruction').querySelector('canvas');
+  $('vl-main-reconstruction').parentElement.querySelector('.density-scale').hidden=!image;
+  if(image)$('vl-row-plot').style.height=image.getBoundingClientRect().height+'px';
+  rowPlot($('vl-row-plot'),study.truth,mainTrial,n,row,study.configuration.alpha);
 }
 $('vl-main-trial').onchange=guard(loadMain);
 for(const id of ['vl-main-row','vl-ellipse-x','vl-ellipse-y'])$(id).onchange=guard(renderMain);
@@ -118,3 +120,6 @@ window.addEventListener('randomized-selected',guard(async e=>{
   const id=e.detail.analysis_id;await refresh();
   $('vl-template').value='randomized:'+id;$('vl-k').value=e.detail.iteration;context();invalidateGrid();
 }));
+
+let validationWidth=0;
+new ResizeObserver(entries=>{const width=entries[0].contentRect.width;if(width>0&&width!==validationWidth){validationWidth=width;if(study)renderMain();}}).observe(document.querySelector('.vl-main-images'));

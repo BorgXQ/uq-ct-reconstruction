@@ -6,7 +6,11 @@ const browser=await chromium.launch({headless:true});const page=await browser.ne
 const errors=[],external=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(base))external.push(r.url());});
 const check=s=>console.log('PASS '+s);
 const json=async url=>(await page.request.get(base+url)).json();
-const meta=async id=>JSON.parse(await page.locator('#'+id).textContent());
+const meta=async id=>{
+ if(id==='metadata')return json('/api/snapshots/'+await page.inputValue('#snapshots'));
+ if(id==='scan-metadata'){const observation=await json('/api/observations/'+await page.inputValue('#measure-observation'));return {observation,acquisition:await json('/api/acquisitions/'+observation.acquisition_id)};}
+ return JSON.parse(await page.locator('#'+id).textContent());
+};
 const draft=async()=>{await page.click('#draft-tab');await page.waitForFunction(()=>document.querySelector('#preview-status').textContent.includes('Backend conversion complete'));};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function draw(x,y,xx,yy){await page.locator('#editor').scrollIntoViewIfNeeded();const b=await page.locator('#editor').boundingBox();await page.mouse.move(b.x+x*b.width/512,b.y+y*b.height/512);await page.mouse.down();await page.mouse.move(b.x+xx*b.width/512,b.y+yy*b.height/512,{steps:3});await page.mouse.up();await draft();}
@@ -15,29 +19,33 @@ async function terminal(id){for(let i=0;i<1000;i++){const j=await json('/api/job
 async function submitScan(){const response=page.waitForResponse(r=>r.url()===base+'/api/acquisitions'&&r.request().method()==='POST');await page.click('#generate-scan');const j=await(await response).json();assert.ok(j.job_id,JSON.stringify(j));const done=await terminal(j.job_id);assert.equal(done.status,'completed',JSON.stringify(done));await page.waitForFunction(id=>document.querySelector('#measure-observation').value===id,done.result.observation_id);return done.result;}
 async function run(K){await field('iterations',K);const response=page.waitForResponse(r=>r.url()===base+'/api/reconstructions'&&r.request().method()==='POST');await page.click('#run-reconstruction');const j=await(await response).json();assert.ok(j.job_id,JSON.stringify(j));const done=await terminal(j.job_id);assert.equal(done.status,'completed',JSON.stringify(done));await page.waitForFunction(id=>document.querySelector('#reconstructions').value===id,done.result.reconstruction_id);await page.waitForFunction(k=>document.querySelector('#iteration-status').dataset.iteration===String(k),K);return done.result.reconstruction_id;}
 try{
-  await page.goto(base);await draft();
+  await page.goto(base);await draft();await page.selectOption('#resolution','32');await draft();
   await field('shade',192);await page.click('[data-tool=circle]');await draw(160,160,255,160);
   await field('shade',64);await page.click('[data-tool=square]');await draw(300,300,410,370);
   await field('shade',137);await page.click('[data-tool=brush]');await draw(60,400,180,420);
   await page.click('#freeze');await page.waitForFunction(()=>document.querySelector('#freeze-status').textContent.startsWith('Frozen snapshot'));
   const source=await meta('metadata');const frozenSource=await json('/api/snapshots/'+source.snapshot_id);await page.waitForFunction(()=>!document.querySelector('#nav-measure').disabled);
   await page.click('#nav-measure');assert.equal(await page.locator('#measure-snapshot').inputValue(),source.snapshot_id);
+  assert.equal(await page.inputValue('#n-angles'),'180');assert.equal(await page.inputValue('#sigma'),'0.1');
+  for(const selector of ['#angle-start','#angle-end','#sino-low','#sino-high','#scan-metadata','#ray-info','#inspect-ray','#new-exact-observation'])assert.equal(await page.locator(selector).count(),0);
+  await field('n-angles',90);await field('sigma',0);
   const clean=await submitScan();let scan=await meta('scan-metadata');assert.equal(scan.observation.noise.sigma,0);
+  assert.equal(await page.locator('#job-panel').evaluate(el=>el.tagName==='DETAILS'&&!el.open),true);
+  await page.locator('#job-panel > summary').click();assert.equal(await page.locator('#jobs').isVisible(),true);await page.locator('#job-panel > summary').click();
   const acq=await json('/api/acquisitions/'+clean.acquisition_id),observation0=await json('/api/observations/'+clean.observation_id);
   assert.deepEqual(observation0.y,acq.y_clean);assert.equal(acq.shape[0],90);assert.equal(acq.shape[1],47);
-  await field('ray-angle',12);await field('ray-detector',18);await page.click('#inspect-ray');
-  assert.ok((await page.locator('#ray-info').textContent()).includes(acq.y_clean[12*47+18].toPrecision(17)));
-  // Compare a display cell's color against the actual shared-scale transformation.
-  const low=Number(await page.locator('#sino-low').textContent()),high=Number(await page.locator('#sino-high').textContent());
+  const low=Math.min(...acq.y_clean,...observation0.y),high=Math.max(...acq.y_clean,...observation0.y);
   const imageByte=await page.locator('#clean-sinogram').evaluate(c=>c.getContext('2d').getImageData(12,47-1-18,1,1).data[0]);
   assert.ok(Math.abs(imageByte-Math.round(255*(acq.y_clean[12*47+18]-low)/(high-low)))<=1);
-  check('M1 drawing → frozen float64 truth → 90×47 clean scan, axes, sample inspection and orientation');
+  check('M1 drawing → frozen float64 truth → 90×47 clean scan, axes, orientation');
   await field('sigma',.01);await field('noise-seed',19);
   const noiseResponse=page.waitForResponse(r=>r.url().endsWith('/observations')&&r.request().method()==='POST');
   await page.click('#new-observation');const nj=await(await noiseResponse).json();const nd=await terminal(nj.job_id);
   await page.waitForFunction(id=>document.querySelector('#measure-observation').value===id,nd.result.observation_id);
   const noisy=await json('/api/observations/'+nd.result.observation_id);
   assert.equal(noisy.acquisition_id,clean.acquisition_id);assert.ok(noisy.y.some(v=>v<0));assert.notDeepEqual(noisy.y,observation0.y);
+  assert.equal(await page.locator('#job-panel').evaluate(el=>el.open),false);
+  await page.click('#new-randomized-observation');await page.waitForFunction(()=>!document.querySelector('#uq-workspace').hidden);assert.equal(await page.inputValue('#rq-observation'),noisy.observation_id);await page.click('#nav-measure');
   await page.waitForFunction(()=>!document.querySelector('#nav-reconstruct').disabled);await page.screenshot({path:'/tmp/ct-m2-measure.png',fullPage:true});
   await page.click('#nav-reconstruct');const recid=await run(201);const record=await json('/api/reconstructions/'+recid);
   for(const k of [0,1,2,100,201]){
@@ -61,9 +69,9 @@ try{
   assert.equal(await page.locator('#iteration-status').getAttribute('data-iteration'),'6');await page.unroute(`**/api/reconstructions/${recid}/checkpoints/3`);
   check('late checkpoint response cannot relabel a newer inspected iteration');
   await page.click('#nav-measure');await page.selectOption('#measure-observation',clean.observation_id);
-  await page.waitForFunction(id=>document.querySelector('#scan-metadata').textContent.includes(id),clean.observation_id);
+  await page.waitForFunction(id=>document.querySelector('#measure-status').textContent.includes(id.slice(0,8)),clean.observation_id);
   assert.equal((await meta('scan-metadata')).observation.noise.sigma,0);
-  await page.selectOption('#measure-observation',noisy.observation_id);await page.waitForFunction(id=>document.querySelector('#scan-metadata').textContent.includes(id),noisy.observation_id);
+  await page.selectOption('#measure-observation',noisy.observation_id);await page.waitForFunction(id=>document.querySelector('#measure-status').textContent.includes(id.slice(0,8)),noisy.observation_id);
   check('historical observations restore their own captured noise and geometry');
   // Hold the job-submission reply, edit drawing and prospective settings before completion is handled.
   let releaseScan,scanEntered;const scanHeld=new Promise(r=>releaseScan=r),scanArrived=new Promise(r=>scanEntered=r);

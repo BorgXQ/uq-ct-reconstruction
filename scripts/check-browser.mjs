@@ -20,7 +20,16 @@ async function gesture(x,y,xx=x,yy=y,steps=2) {
 }
 const pixel=async(x,y)=>page.locator('#editor').evaluate((canvas,{x,y})=>Array.from(canvas.getContext('2d').getImageData(x,y,1,1).data),{x,y});
 const raster=async()=>page.locator('#editor').evaluate(canvas=>Array.from(canvas.getContext('2d').getImageData(0,0,512,512).data));
-const metadata=async()=>JSON.parse(await page.locator('#metadata').textContent());
+const previews=new Map();
+page.on('response',async r=>{if(r.url().endsWith('/api/images/preview')&&r.ok()){try{const data=await r.json();previews.set(data.content_hash,data);}catch{}}});
+await page.addInitScript(()=>window.addEventListener('ct-draft',e=>window.__draftHash=e.detail.content_hash));
+const metadata=async()=>{
+  await page.waitForFunction(()=>document.querySelector('#freeze').textContent!=='Freezing…');
+  if(await page.locator('#frozen-tab').getAttribute('aria-pressed')==='true')return getSnapshot(await page.inputValue('#snapshots'));
+  const hash=await page.evaluate(()=>window.__draftHash);
+  for(let i=0;i<100;i++){if(previews.has(hash))return previews.get(hash);await page.waitForTimeout(10);}
+  throw Error('No preview response for displayed draft');
+};
 const getSnapshot=async id=>(await page.request.get(base+'/api/snapshots/'+id)).json();
 async function clear(){await page.click('#clear');await draft();}
 const check=message=>console.log('PASS '+message);
@@ -28,18 +37,20 @@ try {
   await page.goto(base);await wait();
   assert.equal(await page.locator('#nav-uq').count(),1);
   assert.equal((await metadata()).statistics.maximum,0);
-  assert.equal(await page.locator('#resolution').inputValue(),'32');
-  check('local shell, actual blank draft, defaults and integrated workflow navigation');
+  assert.equal(await page.locator('#resolution').inputValue(),'64');
+  for(const selector of ['[data-tool=bucket]','#tolerance','#metadata','#statistics','#pixel-info','#inspect','#capacity','#draw-workspace .scale'])assert.equal(await page.locator(selector).count(),0);
+  const cards=await page.locator('.draw-grid > .panel').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
+  assert.equal(cards[0].width,cards[1].width);assert.equal(cards[0].height,cards[1].height);assert.equal(cards[0].y,cards[1].y);assert.ok(cards[1].x>cards[0].x);
+  const editorSize=await page.locator('#editor').boundingBox(),numericalSize=await page.locator('#numerical').boundingBox();assert.equal(editorSize.width,numericalSize.width);assert.equal(editorSize.height,numericalSize.height);
+  check('M6 equal Draw cards, 64² default, removed bucket/inspectors/metadata, blank preview');
 
   await shade(128);await gesture(100,100);await draft();
   assert.deepEqual(await pixel(100,100),[128,128,128,255]);
   await gesture(100,100,400,100,1);await draft();
   for(const x of [120,250,380]) assert.equal((await pixel(x,100))[0],128);
-  await page.fill('#row','6');await page.fill('#column','6');await page.click('#inspect');
-  assert.match(await page.locator('#pixel-info').textContent(),/float64/);
   await tool('eraser');await gesture(250,100);await draft();assert.deepEqual(await pixel(250,100),[0,0,0,255]);
   await tool('brush');assert.equal(await page.locator('#shade').inputValue(),'128');
-  check('arbitrary grayscale brush, continuous fast stroke, dab, eraser, pixel inspector');
+  check('arbitrary grayscale brush, continuous fast stroke, dab, eraser');
 
   await clear();await tool('circle');await shade(192);await gesture(130,130,190,130);await draft();
   assert.equal((await pixel(130,130))[0],192);
@@ -48,7 +59,7 @@ try {
   await tool('square');await shade(64);await page.selectOption('#shape-mode','outline');await gesture(260,260,420,380);await draft();
   assert.equal((await pixel(340,340))[0],0);assert.equal((await pixel(420,340))[0],64);
   assert.equal((await pixel(254,254))[0],64); // Sharp outer square corner, not a rounded rectangle.
-  await tool('bucket');await shade(128);await gesture(340,340);await draft();
+  await tool('brush');await shade(128);await gesture(340,340);await draft();
   assert.equal((await pixel(340,340))[0],128);assert.equal((await pixel(10,10))[0],0);
   const filled=await raster();await page.click('#undo');await draft();assert.equal((await pixel(340,340))[0],0);
   await page.click('#redo');await draft();assert.deepEqual(await raster(),filled);
@@ -65,22 +76,20 @@ try {
     assert.equal(displayed[4*i],Math.round(255*stored.pixels[i]));
     assert.equal(displayed[4*i+3],255);
   }
-  await page.fill('#row','8');await page.fill('#column','8');await page.click('#inspect');
-  assert.ok((await page.locator('#pixel-info').textContent()).includes(stored.pixels[8*32+8].toPrecision(17)));
-  await page.click('#clear');await page.click('#undo');await page.selectOption('#resolution','64');await draft();
+  await page.click('#clear');await page.click('#undo');await page.selectOption('#resolution','32');await draft();
   assert.deepEqual(await raster(),demo);assert.deepEqual(await getSnapshot(first.snapshot_id),stored);
   await page.click('#frozen-tab');assert.match(await page.locator('#preview-status').textContent(),/Differs/);
-  assert.equal((await metadata()).resolution,32);
-  await page.selectOption('#resolution','32');await draft();await page.click('#frozen-tab');
+  assert.equal((await metadata()).resolution,64);
+  await page.selectOption('#resolution','64');await draft();await page.click('#frozen-tab');
   assert.match(await page.locator('#preview-status').textContent(),/Matches current/);
-  await page.selectOption('#resolution','64');await draft();await page.click('#freeze');
-  await page.waitForFunction(id=>JSON.parse(document.querySelector('#metadata').textContent).snapshot_id!==id,first.snapshot_id);
-  const second=await metadata();assert.equal(second.resolution,64);
+  await page.selectOption('#resolution','32');await draft();await page.click('#freeze');
+  await page.waitForFunction(id=>document.querySelector('#snapshots').value!==id,first.snapshot_id);
+  const second=await metadata();assert.equal(second.resolution,32);
   await page.selectOption('#snapshots',first.snapshot_id);
-  await page.waitForFunction(id=>JSON.parse(document.querySelector('#metadata').textContent).snapshot_id===id,first.snapshot_id);
+  await page.waitForFunction(id=>document.querySelector('#snapshots').value===id,first.snapshot_id);
   assert.deepEqual((await getSnapshot(first.snapshot_id)).pixels,stored.pixels);
   await page.screenshot({path:'/tmp/ct-m1-desktop.png',fullPage:true});
-  check('demonstration: circle 192, square outline 64, fill 128, stroke 137, fractional averages, two immutable snapshots, matching after undo');
+  check('demonstration: circle 192, square outline 64, brush 128, stroke 137, fractional averages, two immutable snapshots, matching after undo');
 
   await page.click('#draft-tab');await clear();
   await tool('square');await page.selectOption('#shape-mode','filled');await shade(192);
@@ -89,13 +98,12 @@ try {
     const x=dx<0?230:280,y=dy<0?230:280;assert.equal((await pixel(x,y))[0],192);
     assert.equal((await pixel(dx<0?210:302,y))[0],0);
   }
-  await clear();await tool('bucket');await shade(64);await gesture(10,10);await draft();
+  await clear();await tool('square');await page.selectOption('#shape-mode','filled');await shade(64);await gesture(1,1,511,511);await draft();
   await tool('circle');await shade(192);await page.selectOption('#shape-mode','outline');await gesture(256,256,300,256);await draft();
   assert.equal((await pixel(256,256))[0],64);assert.equal((await pixel(300,256))[0],192);
   await page.selectOption('#shape-mode','filled');await gesture(256,256,290,256);await draft();assert.equal((await pixel(256,256))[0],192);
   const beforeNoOp=await page.locator('#revision').textContent();
   await gesture(100,100);assert.equal(await page.locator('#revision').textContent(),beforeNoOp);
-  await tool('bucket');await shade(192);await gesture(256,256);assert.equal(await page.locator('#revision').textContent(),beforeNoOp);
   await page.fill('#shade','999');await page.locator('#shade').press('Tab');assert.equal(await page.locator('#shade').inputValue(),'192');
   // A numeric input owns Ctrl+Z; it must not undo the image.
   await page.locator('#shade').focus();await page.keyboard.press('Control+z');
@@ -112,12 +120,10 @@ try {
   await page.setViewportSize({width:540,height:1050});await clear();await tool('circle');await shade(137);await gesture(256,256,306,256);await draft();
   assert.equal((await pixel(256,300))[0],137);assert.equal((await pixel(300,256))[0],137);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  const beforeOverlay=await raster();await page.check('#grid');await page.click('#overlay');assert.deepEqual(await raster(),beforeOverlay);
-  await page.locator('#overlay').focus();await page.keyboard.press('ArrowUp');
-  assert.equal(await page.locator('#row').inputValue(),'30');
+  const beforeOverlay=await raster();await page.check('#grid');assert.deepEqual(await raster(),beforeOverlay);
   await page.screenshot({path:'/tmp/ct-m1-mobile.png',fullPage:true});
   await page.setViewportSize({width:1400,height:1200});
-  check('responsive pointer mapping, circle geometry, separate grid/selection overlay, no horizontal overflow');
+  check('responsive pointer mapping, circle geometry, separate grid overlay, no horizontal overflow');
 
   // Capture A at 16, hold response, then let B at 64 finish first.
   let releaseA, enteredA;const entered=new Promise(r=>enteredA=r),held=new Promise(r=>releaseA=r);
@@ -166,7 +172,7 @@ try {
 
   await page.reload();await wait();await page.waitForFunction(()=>document.querySelector('#snapshots').options.length>1);
   await page.selectOption('#snapshots',first.snapshot_id);
-  await page.waitForFunction(id=>JSON.parse(document.querySelector('#metadata').textContent).snapshot_id===id,first.snapshot_id);
+  await page.waitForFunction(id=>document.querySelector('#snapshots').value===id,first.snapshot_id);
   assert.deepEqual((await getSnapshot(first.snapshot_id)).pixels,stored.pixels);
   await page.route('**/api/snapshots/'+first.snapshot_id, route=>route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:{message:'Snapshot unavailable after restart'}})}));
   await page.click('#refresh-snapshots');await page.waitForFunction(()=>document.querySelector('#preview-status').textContent.includes('Snapshot unavailable'));

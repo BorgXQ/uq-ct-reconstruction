@@ -22,8 +22,8 @@ try{
   await field('shade',83);await page.click('[data-tool=square]');await page.locator('#editor').scrollIntoViewIfNeeded();b=await page.locator('#editor').boundingBox();
   await page.mouse.move(b.x+b.width*.65,b.y+b.height*.63);await page.mouse.down();await page.mouse.move(b.x+b.width*.81,b.y+b.height*.79);await page.mouse.up();
   await page.click('#freeze');await page.waitForFunction(()=>document.querySelector('#freeze-status').textContent.startsWith('Frozen snapshot'));
-  const snapshot=JSON.parse(await page.locator('#metadata').textContent());
-  await page.waitForFunction(()=>!document.querySelector('#nav-measure').disabled);await page.click('#nav-measure');await field('sigma',.01);await field('noise-seed',19);
+  const snapshot=await get('/api/snapshots/'+await page.inputValue('#snapshots'));
+  await page.waitForFunction(()=>!document.querySelector('#nav-measure').disabled);await page.click('#nav-measure');await field('n-angles',90);await field('sigma',.01);await field('noise-seed',19);
   const scan=await action('generate-scan','/api/acquisitions');await page.waitForFunction(id=>document.querySelector('#measure-observation').value===id,scan.observation_id);
   await page.click('#nav-reconstruct');await field('iterations',201);
   const rec=await action('run-reconstruction','/api/reconstructions');await page.waitForFunction(()=>document.querySelector('#iteration-status').dataset.iteration==='201');
@@ -94,6 +94,7 @@ try{
   });
   await page.click('#uq-submit');await page.waitForFunction(()=>document.querySelector('#ct-error').textContent.includes('capacity exceeded'));
   assert.equal(await page.locator('#uq-analyses').inputValue(),zeror.analysis_id);await page.unroute('**/api/exact-analyses');
+  await page.locator('#job-panel > summary').click();
   // A real longer build occupies the existing single worker while an exact plan is canceled.
   const blocking=await post('/api/acquisitions',{request_id:'block-for-cancel',snapshot_id:snapshot.snapshot_id,
     geometry:{n_angles:360,n_detectors:256,start_degrees:0,end_degrees:180},noise:{sigma:0,seed:0}});

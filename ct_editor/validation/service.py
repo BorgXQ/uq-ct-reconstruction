@@ -71,7 +71,7 @@ class ValidationService:
     def __init__(self,randomized,config):
         self.randomized=randomized;self.exact=randomized.exact;self.ct=randomized.ct;self.lock=RLock()
         self.records={};self.pending={};self.grids={};self.replays={};self.leases=[]
-        self.limit=config.get('VALIDATION_LIMIT',24);self.max_work=config.get('VALIDATION_MAX_WORK',120_000_000_000)
+        self.limit=config.get('VALIDATION_LIMIT',24);self.max_work=config.get('VALIDATION_MAX_WORK',1_000_000_000_000)
         self.max_trials=config.get('VALIDATION_MAX_TOTAL_TRIALS',10000)
         self.directory=Path(config.get('VALIDATION_ARTIFACT_DIR','.artifacts')).resolve();self.directory.mkdir(parents=True,exist_ok=True)
         self.disk_limit=config.get('VALIDATION_DISK_BYTES',512*1024**2)

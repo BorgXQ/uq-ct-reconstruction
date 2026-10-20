@@ -23,7 +23,7 @@ class RandomizedService:
         self.exact=exact;self.ct=exact.ct
         for table,limit in [('low_rank_factors',32),('randomized_analyses',32),('randomized_views',64),('approximation_diagnostics',32),('stopping_comparisons',16)]:
             self.ct.records[table]={};self.ct.pending[table]=0;self.ct.limits[table]=config.get(table.upper()+'_LIMIT',limit)
-        self.max_work=config.get('RANDOMIZED_MAX_WORK',60_000_000_000)
+        self.max_work=config.get('RANDOMIZED_MAX_WORK',1_000_000_000_000)
 
     def capture(self,data,exact_id=None,recid=None):
         common=('request_id','rank','oversampling','sketch_seed','probe_seed','probe_count','block_size','epsilon','delta','eta','backend','reference')

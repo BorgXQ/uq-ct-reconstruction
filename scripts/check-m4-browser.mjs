@@ -19,11 +19,14 @@ try{
   const scan=await job('/api/acquisitions',{request_id:'m4-scan',snapshot_id:snap.snapshot_id,geometry:{n_angles:30,n_detectors:24,start_degrees:0,end_degrees:180},noise:{sigma:.01,seed:19}});
   const exactrefs=await job('/api/exact-analyses',{request_id:'m4-exact',observation_id:scan.observation_id,step_policy:'safe_induced_norm_v1',source:{M:6,nu:.5,provenance:'Unverified fixed example'},bound_method:'spectral',alpha:.05,selection:{mode:'fixed',iterations:30,provenance:'fixed_predeclared'},settings_origin:'declared_independent',declaration:'Fixed script settings'});
   const exact=await get('/api/exact-analyses/'+exactrefs.analysis_id);
-  await page.goto(base);await page.waitForFunction(()=>!document.querySelector('#nav-uq').disabled);await page.click('#nav-uq');await page.selectOption('#rq-exact',exact.analysis_id);
+  await page.goto(base);await page.waitForFunction(()=>!document.querySelector('#nav-uq').disabled);await page.click('#nav-uq');await page.selectOption('#rq-observation',scan.observation_id);
+  await page.locator('#rq-source-options > summary').click();await page.locator('#rq-approx-options > summary').click();
+  await page.check('#rq-source');await field('rq-nu',.5);await field('rq-M',6);await field('rq-source-provenance','Unverified fixed example');await field('rq-k',30);
+  await page.selectOption('#rq-origin','declared_independent');await page.getByText('Randomization, covariance backend and probability targets',{exact:true}).click();await page.check('#rq-reference');
   await field('rq-rank',16);await field('rq-count',8);
-  const stochastic=await run('/api/uncertainty-comparisons');assert.deepEqual(stochastic.center,exact.center);assert.equal(stochastic.lower,null);assert.deepEqual(stochastic.full_variance,exact.variance);
+  const stochastic=await run('/api/randomized-analyses');assert.deepEqual(stochastic.center,exact.center);assert.equal(stochastic.lower,null);assert.deepEqual(stochastic.full_variance,exact.variance);
   assert.match(await page.locator('#rq-interpretation').textContent(),/unavailable/);
-  await field('rq-eta',.1);await field('rq-eta-provenance','Unverified omitted bias declaration');const full=await run('/api/uncertainty-comparisons');
+  await field('rq-eta',.1);await field('rq-eta-provenance','Unverified omitted bias declaration');const full=await run('/api/randomized-analyses');
   assert.ok(full.lower);assert.equal(full.coverage_expression_applicable,false);assert.equal(full.probe_control.control_established,false);
   await field('rq-row',7);await field('rq-col',4);await page.click('#rq-pixel');const text=await page.locator('#rq-pixel-info').textContent();assert.ok(text.includes(full.lower[116].toPrecision(17)));assert.ok(text.includes(full.signed_residual[116].toPrecision(17)));
   const canvas=page.locator('#rq-map-grid canvas').first();assert.ok((await canvas.boundingBox()).width>200);
@@ -41,7 +44,7 @@ try{
   await field('rq-inspect-k',0);await action('rq-inspect',`/api/randomized-analyses/${full.analysis_id}/inspection-requests`);await page.waitForFunction(()=>document.querySelector('#rq-inspection-status').textContent.includes('inspecting k 0;'));
   assert.match(await page.locator('#rq-interpretation').textContent(),/unavailable/);
   console.log('PASS stale inspected-k responses and initialization state');
-  await page.selectOption('#rq-route','new');await page.selectOption('#rq-observation',scan.observation_id);await page.selectOption('#rq-mode','automatic');await field('rq-budget',50);
+  await page.selectOption('#rq-observation',scan.observation_id);await page.uncheck('#rq-reference');await page.selectOption('#rq-mode','automatic');await field('rq-budget',50);
   await page.check('#rq-source');await field('rq-nu',.5);await field('rq-M',.01);await field('rq-source-provenance','Predeclared test');await page.selectOption('#rq-origin','declared_independent');
   const automatic=await run('/api/randomized-analyses');assert.equal(automatic.status,'completed');assert.ok(automatic.selected_k>=1);assert.equal(automatic.reference.status,'unavailable');
   const rec=await get('/api/reconstructions/'+automatic.reconstruction_id);assert.deepEqual(rec.pixels,automatic.center);

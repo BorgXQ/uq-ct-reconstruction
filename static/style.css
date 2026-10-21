@@ -73,3 +73,12 @@
 
 .rq-primary-grid > .reconstruction-plot-card{display:grid;grid-template-rows:subgrid;grid-row:span 2}
 .rq-interval-panel{margin-top:24px}
+
+#coverage-diagnostics{margin-top:24px}
+.coverage-diagnostic-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.coverage-diagnostic-plot{min-width:0}
+.coverage-diagnostic-plot canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.diagnostic-gradient{height:12px;margin-top:8px;background:linear-gradient(to right,#2166ac,#f7f7f7,#b2182b)}
+.diagnostic-scale{text-align:center;font-size:12px}
+.diagnostic-pixel{font-size:12px;min-height:5em}
+@media(max-width:900px){.coverage-diagnostic-grid{grid-template-columns:1fr}}

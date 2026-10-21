@@ -43,6 +43,17 @@ try{
  assert.equal(await page.locator('#coverage-scale .density-ticks span').count(),11);
  const corner=await page.locator('#coverage-image').evaluate(el=>Array.from(el.getContext('2d').getImageData(0,0,1,1).data));
  const {coverageBytes}=await import('../static/coverage-colors.js');assert.deepEqual(corner,Array.from(coverageBytes([values[0]])));
+ assert.equal(await page.locator('#coverage-diagnostics').evaluate(el=>el.open),false);
+ await page.locator('#coverage-diagnostics > summary').click();await page.waitForSelector('#coverage-bias-plot canvas');
+ assert.equal(await page.locator('#coverage-variance-plot canvas').count(),1);
+ assert.match(await page.locator('#coverage-diagnostic-summary').textContent(),/3 returned reconstructions/);
+ await page.locator('#coverage-bias-plot canvas').scrollIntoViewIfNeeded();
+ const biasCanvas=await page.locator('#coverage-bias-plot canvas').boundingBox();await page.mouse.move(biasCanvas.x+1,biasCanvas.y+1);
+ assert.match(await page.locator('#coverage-bias-plot .diagnostic-pixel').textContent(),new RegExp((study.maps.corrected.mean[0]-study.truth[0]).toPrecision(4).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+ await page.locator('#coverage-variance-plot canvas').scrollIntoViewIfNeeded();
+ const varCanvas=await page.locator('#coverage-variance-plot canvas').boundingBox();await page.mouse.move(varCanvas.x+1,varCanvas.y+1);
+ assert.ok((await page.locator('#coverage-variance-plot .diagnostic-pixel').textContent()).includes((study.maps.corrected.empirical_variance[0]-a.variance[0]).toPrecision(4)));
+ await page.locator('#coverage-diagnostics > summary').click();
  console.log('PASS automatic coverage at captured K, matching settings, whole-image mean and original-observation plot');
  // Restoring a reconstruction loads its study without submitting another run.
  await page.selectOption('#rq-analyses','');await page.selectOption('#rq-analyses',a.analysis_id);

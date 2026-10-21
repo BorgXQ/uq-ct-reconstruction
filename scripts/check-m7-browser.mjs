@@ -22,12 +22,12 @@ try{
  await page.locator('[data-parameter="rq-trials"]').hover();await page.waitForSelector('#parameter-tooltip:not([hidden])');await page.keyboard.press('Escape');
  await page.selectOption('#rq-mode','fixed');await page.fill('#rq-k','5');await page.fill('#rq-trials','3');
  await page.locator('#rq-approx-options > summary').click();await page.fill('#rq-rank','4');await page.fill('#rq-p','4');await page.fill('#rq-count','4');
- const a=await reconstruct();assert.equal(a.iteration,5);
+ const a=await reconstruct();assert.equal(a.iteration,5);assert.equal(a.step.step_policy,'power_iteration_half_v1');assert.ok(a.step.power_relative_residual<=1e-8);
  await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'),{},{timeout:120000});
  assert.equal(await page.locator('#coverage-image').isVisible(),true);assert.match(await page.locator('#coverage-title').textContent(),/, 3 trials\)/);
  const studies=(await get('/api/validation-studies')).studies;const entry=studies.find(s=>s.plan.template_id===a.analysis_id);assert.ok(entry);
  const study=await get('/api/validation-studies/'+entry.study_id+'?arrays=1');
- assert.equal(study.plan.iterations,a.iteration);assert.equal(study.plan.trials,3);assert.equal(study.plan.protocol,'fixed_algorithm');assert.equal(study.plan.comparison,'common_k');assert.deepEqual(study.plan.methods,['corrected']);
+ assert.deepEqual(study.step,a.step);assert.equal(study.plan.iterations,a.iteration);assert.equal(study.plan.trials,3);assert.equal(study.plan.protocol,'fixed_algorithm');assert.equal(study.plan.comparison,'common_k');assert.deepEqual(study.plan.methods,['corrected']);
  assert.equal(study.configuration.rank,a.configuration.rank);assert.deepEqual(study.configuration.source,a.configuration.source);
  const values=study.maps.corrected.coverage;
  const mean=(100*values.reduce((s,v)=>s+v,0)/values.length).toFixed(2);

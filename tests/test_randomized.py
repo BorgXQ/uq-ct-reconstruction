@@ -143,6 +143,17 @@ class RandomizedServiceTests(unittest.TestCase):
         self.assertNotEqual(a['center'],b['center'])
         c=self.run_random(source=source,eta=dict(value=2,provenance='Test'),alpha=.01,selection=dict(mode='automatic',budget=30))
         self.assertEqual(c['selected_k'],a['selected_k']);self.assertNotEqual(c['total_half_width'],a['total_half_width'])
+    def test_power_step_shared_with_reference_and_validation(self):
+        kwargs=dict(step_policy='power_iteration_half_v1',source=dict(M=8,nu=.5,provenance='Test'),eta=dict(value=.1,provenance='Test'))
+        with patch.object(self.ex,'spectrum',side_effect=AssertionError('Hidden full SVD')):
+            a=self.run_random(**kwargs)
+        b=self.run_random(**kwargs,reference=True)
+        self.assertEqual(a['step'],b['step'])
+        self.assertEqual(a['center'],b['center'])
+        job=self.job('/api/validation-studies',dict(request_id='power-validation',template_id=a['analysis_id'],trials=2,reference=False,methods=['corrected'],diagnostics='none'))
+        study=self.c.get('/api/validation-studies/'+job['result']['study_id']).json
+        self.assertEqual(study['step'],a['step'])
+
     def test_common_k_reference_inspection_diagnostics(self):
         exact=self.run_exact(source=dict(M=6,nu=.5,provenance='Declared'))
         request=self.rrequest();common={k:request[k] for k in ('request_id','rank','oversampling','sketch_seed','probe_seed','probe_count','block_size','epsilon','delta','eta','backend','reference')}

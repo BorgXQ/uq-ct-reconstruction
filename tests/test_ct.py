@@ -280,3 +280,23 @@ class JobTests(unittest.TestCase):
         self.assertEqual(runner.get(first['job_id']).snapshot()['status'],'canceled')
 
 if __name__=='__main__': unittest.main()
+
+class PowerStepTests(unittest.TestCase):
+    def test_power_half_step_matches_spectrum_with_loose_safe_bound(self):
+        a=np.zeros((64,64));a[0,:]=1;a[:,0]=1
+        op=Operator(Geometry.arrays(8,np.linspace(0,np.pi,8,endpoint=False),np.linspace(-1,1,8)),csr_matrix(a))
+        step=resolve_step(op,{'mode':'automatic_power'})
+        maximum=np.linalg.eigvalsh(a.T@a)[-1]
+        self.assertAlmostEqual(step['lambda_max_estimate']/maximum,1,places=7)
+        self.assertGreaterEqual(step['power_upper_bound'],maximum*(1-1e-12))
+        self.assertLessEqual(step['omega']*step['power_upper_bound'],1)
+        self.assertGreater(step['omega'],2/op.metadata()['L_safe'])
+        result=landweber(op,np.ones(64),step['omega'],3)
+        self.assertTrue(np.isfinite(result['final']).all())
+        with patch.object(op,'forward',side_effect=AssertionError('Cached step should be reused')):
+            self.assertEqual(resolve_step(op,{'mode':'automatic_power'}),step)
+
+    def test_power_step_handles_null_directions(self):
+        a=np.diag([4.,2.,0.,0.]);op=Operator(Geometry.arrays(2,[0,np.pi/2],[-.5,.5]),csr_matrix(a))
+        step=resolve_step(op,{'mode':'automatic_power'})
+        self.assertAlmostEqual(step['omega'],1/32,places=9)

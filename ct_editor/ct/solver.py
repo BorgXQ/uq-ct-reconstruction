@@ -13,17 +13,54 @@ def frozen_array(x):
     return np.frombuffer(x.tobytes(),dtype='<f8').reshape(x.shape)
 
 
+def power_half_step(operator):
+    """Deterministic, data-independent power iteration on the nonnegative A.T A.
+
+    A positive test vector also supplies the Collatz row-ratio upper bound.
+    This checks stability without treating a Rayleigh estimate as an upper bound.
+    """
+    cached = getattr(operator, '_power_half_step', None)
+    if cached is not None:
+        return dict(cached)
+    safe = operator.metadata()['L_safe']
+    v = np.full(operator.shape[1], 1 / math.sqrt(operator.shape[1]))
+    tolerance = 1e-8
+    for iteration in range(1, 1001):
+        w = operator.adjoint(operator.forward(v))
+        estimate = float(v @ w)
+        if not np.isfinite(w).all() or not math.isfinite(estimate) or estimate <= 0:
+            raise InputError('Power iteration encountered a degenerate operator.', code='invalid_step', status=422)
+        residual = float(np.linalg.norm(w - estimate*v)) / estimate
+        upper = min(safe, float(np.max(w/v)) * (1 + 1e-12))
+        if residual <= tolerance and upper <= 2*estimate:
+            result = dict(omega=1/(2*estimate), step_policy='power_iteration_half_v1',
+                L_safe=safe, lambda_max_estimate=estimate, power_iterations=iteration,
+                power_tolerance=tolerance, power_relative_residual=residual,
+                power_upper_bound=upper, stability_basis='nonnegative_collatz_numerical',
+                stable_certified=True, nonoscillatory_certified=True)
+            operator._power_half_step = result
+            return dict(result)
+        # Keep every coordinate positive, including disconnected/null directions.
+        v = np.maximum(w/np.linalg.norm(w), np.finfo(float).eps)
+        v /= np.linalg.norm(v)
+    raise InputError('Power iteration did not converge to a stable half-step within 1000 iterations.',
+                     code='invalid_step', status=422)
+
+
 def resolve_step(operator, settings):
     fields(settings,('mode','value'),('mode',))
     L=operator.metadata()['L_safe']
     if not np.isfinite(L) or L<=0: raise InputError('All selected rays miss or the operator has an invalid norm.',code='degenerate_operator',status=422)
+    if settings['mode']=='automatic_power':
+        if 'value' in settings: raise InputError('Automatic step cannot include a manual value.','value')
+        return power_half_step(operator)
     if settings['mode']=='automatic_safe':
         if 'value' in settings: raise InputError('Automatic step cannot include a manual value.','value')
         omega=1/(2*L);policy='safe_induced_norm_v1'
     elif settings['mode']=='manual':
         omega=scalar(settings.get('value'),'value');policy='manual_safe_bound_v1'
         if not 0<omega<2/L: raise InputError(f'Manual step must satisfy 0 < omega < {2/L:.17g}.','value','invalid_step',422)
-    else: raise InputError('Only automatic_safe and manual step modes are supported.','mode')
+    else: raise InputError('Only automatic_power, automatic_safe and manual step modes are supported.','mode')
     return dict(omega=omega,step_policy=policy,L_safe=L,stable_certified=True,nonoscillatory_certified=omega<=1/L)
 
 
@@ -38,6 +75,10 @@ class SpectralCertificate:
 
 def validate_step(operator, omega, certificate=None):
     if certificate is None:
+        if math.isfinite(omega) and omega > 0 and omega >= 2/operator.metadata()['L_safe']:
+            step = power_half_step(operator)
+            if math.isclose(omega,step['omega'],rel_tol=1e-12) and omega*step['power_upper_bound'] < 2*(1-1e-12):
+                return
         return resolve_step(operator, {'mode':'manual','value':omega})
     meta=operator.metadata()
     if (not isinstance(certificate,SpectralCertificate) or

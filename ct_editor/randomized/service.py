@@ -56,7 +56,7 @@ class RandomizedService:
                 fields(selection,('mode','iterations','provenance'),('mode','iterations','provenance'))
                 integer(selection['iterations'],'iterations',1,5000)
             else:raise InputError('Choose fixed or automatic selection.')
-            if config['step_policy'] not in ('safe_induced_norm_v1','exact_spectral_half'):raise InputError('Unsupported fixed-step policy.')
+            if config['step_policy'] not in ('safe_induced_norm_v1','exact_spectral_half','power_iteration_half_v1'):raise InputError('Unsupported fixed-step policy.')
         if parent:
             cfg=parent.meta()['configuration']
             if parent.meta()['status']!='completed' or cfg['initialization']!='zero' or cfg['solver_version']!='landweber_v1' or cfg['dtype']!='float64':
@@ -125,7 +125,7 @@ class RandomizedService:
         if inherited:
             validate_step(op,inherited['omega'])
             return {key:inherited[key] for key in ('omega','step_policy','L_safe','stable_certified','nonoscillatory_certified')}
-        return resolve_step(op,{'mode':'automatic_safe'})
+        return resolve_step(op,{'mode':'automatic_power' if c['step_policy']=='power_iteration_half_v1' else 'automatic_safe'})
 
     def solver(self,op,c,step,k,acquisition,inference,job,sp):
         cfg=dict(observation_id=c['observation_id'],observation_hash=c['observation_hash'],operator_id=c['operator_id'],iterations=k,**step,

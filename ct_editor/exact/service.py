@@ -72,7 +72,7 @@ class ExactService:
             selection=dict(mode='attached',iterations=k,provenance=provenance)
         else:
             oid=identifier(data['observation_id'],'observation_id');policy=data['step_policy']
-            if policy not in ('exact_spectral_half','safe_induced_norm_v1'): raise InputError('Unsupported step policy.','step_policy')
+            if policy not in ('exact_spectral_half','safe_induced_norm_v1','power_iteration_half_v1'): raise InputError('Unsupported step policy.','step_policy')
             sel=data['selection']
             if not isinstance(sel,dict): raise InputError('Expected selection object.')
             if sel.get('mode')=='fixed':

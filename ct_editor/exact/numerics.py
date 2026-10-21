@@ -6,7 +6,7 @@ from threadpoolctl import threadpool_limits
 from ..images import InputError
 from ..ct.geometry import fields, scalar, integer, identifier
 from ..ct.jobs import Canceled
-from ..ct.solver import frozen_array, validate_step
+from ..ct.solver import frozen_array, validate_step, power_half_step
 
 
 def source_config(data):
@@ -29,6 +29,10 @@ def quantile(alpha):
 def resolve_exact_step(operator, spectrum, policy, inherited=None):
     if spectrum.metadata()['operator_id'] != operator.metadata()['operator_id']:
         raise InputError('Spectrum/operator identity mismatch.', code='incompatible_reconstruction', status=422)
+    if inherited is None and policy == 'power_iteration_half_v1':
+        result = power_half_step(operator)
+        validate_step(operator, result['omega'], spectrum.certificate())
+        return result
     maximum = spectrum.metadata()['lambda_max']
     safe = operator.metadata()['L_safe']
     if inherited is not None:

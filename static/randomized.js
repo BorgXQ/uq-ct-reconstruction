@@ -30,7 +30,7 @@ $('rq-form').addEventListener('input',()=>{generation++;controls();});$('rq-form
 function request(){
   const body={request_id:uid(),rank:num('rq-rank'),oversampling:num('rq-p'),sketch_seed:num('rq-sketch'),probe_seed:num('rq-probe'),probe_count:num('rq-count'),block_size:num('rq-block'),epsilon:num('rq-epsilon'),delta:num('rq-delta'),backend:'matrix_free',reference:true,
     eta:$('rq-eta').value.trim()===''?null:{value:num('rq-eta'),provenance:'User-specified omitted-bias assumption; not verified.'}};
-  return ['/api/randomized-analyses',{...body,observation_id:$('rq-observation').value,step_policy:'safe_induced_norm_v1',alpha:num('rq-alpha'),settings_origin:'unverified',declaration:'User-specified settings; noise independence has not been established.',
+  return ['/api/randomized-analyses',{...body,observation_id:$('rq-observation').value,step_policy:'power_iteration_half_v1',alpha:num('rq-alpha'),settings_origin:'unverified',declaration:'User-specified settings; noise independence has not been established.',
     source:{M:num('rq-M'),nu:num('rq-nu'),provenance:'User-specified source assumption; not verified against the drawing.'},
     selection:$('rq-mode').value==='automatic'?{mode:'automatic',budget:num('rq-budget')}:{mode:'fixed',iterations:num('rq-k'),provenance:'imported_selection_unknown'}}];
 }

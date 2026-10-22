@@ -10,6 +10,10 @@ def routes(service):
         data=request.get_json()
         if not isinstance(data,dict):raise InputError('Expected an object.')
         return data
+    @bp.post('/api/randomized-preparations')
+    def prepare():return jsonify(service.submit(body(),prepare=True)),202
+    @bp.post('/api/randomized-analyses/<aid>/finalize')
+    def finalize(aid):return jsonify(service.finalize(aid,body())),202
     @bp.post('/api/randomized-analyses')
     def create():return jsonify(service.submit(body())),202
     @bp.post('/api/uncertainty-comparisons')

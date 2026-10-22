@@ -182,9 +182,21 @@ class RandomizedService:
             details['appendix'].update(rho=rho,rho_status='strict_contraction_numerically_checked' if rho is not None and rho<1 else 'rank_deficient_or_unresolved')
         return arrays,details
 
-    def submit(self,data,exact_id=None,recid=None):
-        rid,c,parent,spec,acquisition,base=self.capture(deepcopy(data),exact_id,recid)
-        workspace,cost=self.preflight(spec,c);aid=uuid4().hex;inference=self.ct.inference(c['observation_id'])
+    def submit(self,data,exact_id=None,recid=None,prepare=False):
+        data=deepcopy(data)
+        if prepare: data['eta']=None
+        rid,c,parent,spec,acquisition,base=self.capture(data,exact_id,recid)
+        if prepare and c['source'] is None:raise InputError('Source parameters are required for staged preparation.')
+        workspace,cost=self.preflight(spec,c)
+        if prepare:
+            kmax=c['selection'].get('budget',c['selection'].get('iterations',0))
+            extra=2*kmax*spec.shape[0]*(2*spec.resolution+1)
+            if cost['estimated_scalar_work']+extra>self.max_work:raise InputError('Preparation and bias calibration exceed the operator-work limit.',code='resource_limit',status=507)
+            cost['estimated_scalar_work']+=extra
+            workspace+=spec.shape[1]*8*8+spec.shape[0]*2*8
+            cost['workspace_bytes']=workspace
+            cost['estimated_normal_column_actions']+=2*kmax
+        aid=uuid4().hex;inference=self.ct.inference(c['observation_id'])
         slots=['low_rank_factors','randomized_analyses']+([] if parent else ['reconstructions'])
         def work(job):
             with threadpool_limits(limits=1,user_api='blas'):
@@ -214,6 +226,20 @@ class RandomizedService:
                     if k is not None:
                         arrays,details=self.bundle(op,sp,factors,c,step,k,center,policy,job,evaluated);meta.update(details,status='completed')
                 else:meta.update(probability(c,factors,None))
+                if prepare:
+                    meta['workflow_phase']='prepared'
+                    if k is not None:
+                        job.progress('Calibrating omitted bias from drawing',0,k)
+                        truth=self.ct.snapshots.array(acquisition['snapshot_id']).ravel()
+                        _,diagnostic=bias_diagnostics(op,factors,step['omega'],k,truth,
+                            meta['retained_bias_allowance']['value'] if meta.get('retained_bias_allowance') else None,None,job.check)
+                        ratio=diagnostic['omitted_retained_ratio']
+                        if diagnostic['ratio_status']=='both_zero':ratio=0.
+                        if ratio is not None and math.isfinite(ratio):ratio=float(np.nextafter(ratio,np.inf)) if ratio else 0.
+                        else:ratio=None
+                        meta['eta_calibration']={**diagnostic,'eta':ratio,'iteration':k,
+                            'retained_bound':meta['retained_bias_allowance']['value'] if meta.get('retained_bias_allowance') else None,
+                            'method':'drawing_bias_ratio_v1'}
                 meta.update(timings=timings,elapsed_seconds=perf_counter()-started)
                 if meta['status']!='canceled':items.append(('low_rank_factors',fid,factors.record))
                 else:meta['factor_record_id']=None
@@ -221,6 +247,39 @@ class RandomizedService:
                 def publish():self.ct._publish(items);return dict(analysis_id=aid,reconstruction_id=meta['reconstruction_id'])
                 job.commit(publish,'canceled' if meta['status']=='canceled' else 'completed')
         return self.ct._submit('randomized_analysis',rid,dict(analysis_id=aid,configuration=c,cost=cost),slots,workspace,work)
+
+    def finalize(self,aid,data):
+        fields(data,('request_id','alpha'),('request_id','alpha'))
+        rid=identifier(data['request_id'],'request_id');alpha=scalar(data['alpha'],'alpha',0,1);quantile(alpha)
+        record=self.ct._get('randomized_analyses',aid);base=record.meta();cal=base.get('eta_calibration')
+        if base.get('workflow_phase')!='prepared' or base['status']!='completed' or not cal or cal['eta'] is None:
+            raise InputError('Prepare a reconstruction with a finite calibrated η first.')
+        c=deepcopy(base['configuration']);c['alpha']=alpha
+        c['eta']=dict(value=cal['eta'],provenance='Calibrated from frozen drawing at selected K; retained bound requires separate justification.')
+        new_id=uuid4().hex
+        def work(job):
+            arrays={key:record.array(key) for key,_ in record.payloads}
+            arrays,details=assemble(arrays['center'],arrays,base['retained_bias_allowance'],c['eta'],alpha)
+            # Optional reference endpoints must follow the same new alpha.
+            if 'full_variance' in arrays:
+                full,_=intervals(arrays['center'],dict(pixel_sd=arrays['full_pixel_sd'],variance=arrays['full_variance']),base['full_bias_allowance'],alpha)
+                arrays.update({f'full_{key}':v for key,v in full.items() if key!='center'})
+                combined=base.get('tsvd',{}).get('combined_bias')
+                if combined is not None:
+                    half=quantile(alpha)*arrays['full_pixel_sd']+combined
+                    arrays.update(tsvd_half_width=half,tsvd_lower=arrays['center']-half,tsvd_upper=arrays['center']+half)
+            factors=Factors(self.ct._get('low_rank_factors',base['factor_record_id']))
+            meta={**base,**probability(c,factors,base['iteration']),**details,'analysis_id':new_id,
+                'configuration':c,'configuration_hash':digest(c),'prepared_analysis_id':aid,
+                'workflow_phase':'finalized','created_at':now()}
+            meta['retained_bias_assumption_status']='numerically_supported_at_selected_k' if cal['retained_assumption_supported'] else 'contradicted_at_selected_k'
+            meta['omitted_bias_assumption_status']='calibrated_from_drawing_at_selected_k'
+            meta['coverage_interpretation']='Exploratory truth-calibrated intervals — probability conditions not established'
+            if not cal['retained_assumption_supported']:
+                meta['coverage_interpretation']+='; retained-bias bound fails despite calibrated η'
+            job.check();out=Record.make(meta,**arrays)
+            job.commit(lambda:self.exact._publish_one('randomized_analyses',new_id,out,dict(analysis_id=new_id,prepared_analysis_id=aid)))
+        return self.ct._submit('finalize_intervals',rid,dict(prepared_analysis_id=aid,alpha=alpha),['randomized_analyses'],record.size()*3,work)
 
     def response(self,aid,table='randomized_analyses'):
         response=self.ct._get(table,aid).response();response.pop('history',None)

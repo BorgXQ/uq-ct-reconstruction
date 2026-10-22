@@ -6,7 +6,10 @@ page.on('pageerror',e=>errors.push(e.message));
 const get=async p=>(await page.request.get(base+p)).json();
 async function terminal(id){for(let i=0;i<3000;i++){const j=await get('/api/jobs/'+id);if(['completed','failed','canceled'].includes(j.status))return j;await page.waitForTimeout(25);}throw Error('Timeout');}
 async function action(button,path){const response=page.waitForResponse(r=>r.url()===base+path&&r.request().method()==='POST');await page.click(button);const j=await(await response).json();assert.ok(j.job_id,JSON.stringify(j));const done=await terminal(j.job_id);assert.equal(done.status,'completed',JSON.stringify(done));return done.result;}
-async function reconstruct(){const r=await action('#rq-submit','/api/randomized-analyses');await page.waitForFunction(id=>document.querySelector('#rq-analyses').value===id&&!document.querySelector('#rq-results').hidden,r.analysis_id);return get('/api/randomized-analyses/'+r.analysis_id);}
+async function prepare(){const r=await action('#rq-submit','/api/randomized-preparations');await page.waitForFunction(()=>!document.querySelector('#rq-submit').disabled&&!document.querySelector('#rq-preparation-status').textContent.startsWith('Selecting'));return get('/api/randomized-analyses/'+r.analysis_id);}
+async function finalize(p){const r=await action('#rq-finalize',`/api/randomized-analyses/${p.analysis_id}/finalize`);await page.waitForFunction(id=>document.querySelector('#rq-analyses').value===id&&!document.querySelector('#rq-results').hidden,r.analysis_id);return get('/api/randomized-analyses/'+r.analysis_id);}
+async function reconstruct(){return finalize(await prepare());}
+
 try{
  await page.goto(base);await page.waitForFunction(()=>document.querySelector('#preview-status').textContent.includes('Backend conversion complete'));
  assert.equal(await page.locator('nav button').count(),3);assert.match(await page.locator('#nav-uq').innerText(),/03 Reconstruct/);
@@ -18,20 +21,28 @@ try{
  await page.waitForFunction(()=>document.querySelector('#rq-source-status').textContent.startsWith('Compatible'),{},{timeout:120000});
  assert.equal(await page.locator('#rq-M').getAttribute('readonly'),'');
  const initialM=Number(await page.inputValue('#rq-M'));assert.ok(initialM>0);
- await page.locator('#rq-source-options > summary').click();await page.fill('#rq-nu','0.6');
+ await page.fill('#rq-nu','0.6');
  assert.equal(await page.locator('#rq-submit').isDisabled(),true);assert.equal(await page.inputValue('#rq-M'),'');
  await page.locator('#rq-nu').press('Tab');await page.waitForFunction(()=>document.querySelector('#rq-source-status').textContent.startsWith('Compatible'));
  assert.notEqual(Number(await page.inputValue('#rq-M')),initialM);
  await page.fill('#rq-nu','0.5');await page.locator('#rq-nu').press('Tab');await page.waitForFunction(()=>document.querySelector('#rq-source-status').textContent.startsWith('Compatible'));
- assert.equal(Number(await page.inputValue('#rq-M')),initialM);await page.locator('#rq-source-options > summary').click();
+ assert.equal(Number(await page.inputValue('#rq-M')),initialM);
  assert.equal(await page.locator('#optional-validation,#vl-form,#rq-map-grid,#rq-inspect').count(),0);
  assert.equal(await page.inputValue('#rq-trials'),'100');
  assert.equal(await page.inputValue('#rq-mode'),'automatic');assert.equal(await page.inputValue('#rq-budget'),'1500');
- assert.equal(await page.inputValue('#rq-eta'),'0.1');assert.equal(await page.inputValue('#rq-rank'),'32');
+ assert.equal(await page.inputValue('#rq-eta'),'');assert.equal(await page.locator('#rq-eta').getAttribute('readonly'),'');assert.equal(await page.inputValue('#rq-rank'),'32');
  await page.locator('[data-parameter="rq-trials"]').hover();await page.waitForSelector('#parameter-tooltip:not([hidden])');await page.keyboard.press('Escape');
  await page.selectOption('#rq-mode','fixed');await page.fill('#rq-k','5');await page.fill('#rq-trials','3');
- await page.locator('#rq-approx-options > summary').click();await page.fill('#rq-rank','4');await page.fill('#rq-p','4');await page.fill('#rq-count','4');
- const a=await reconstruct();assert.equal(a.iteration,5);assert.equal(a.step.step_policy,'power_iteration_half_v1');assert.ok(a.step.power_relative_residual<=1e-8);
+ await page.fill('#rq-rank','4');await page.fill('#rq-p','4');await page.fill('#rq-count','4');
+ const studyCount=(await get('/api/validation-studies')).studies.length;
+ const preparation=await prepare();assert.equal(await page.locator('#rq-results').isVisible(),false);
+ assert.equal((await get('/api/validation-studies')).studies.length,studyCount);
+ assert.equal(Number(await page.inputValue('#rq-eta')),preparation.eta_calibration.eta);
+ await page.locator('[data-parameter="rq-eta"]').hover();await page.waitForSelector('#parameter-tooltip:not([hidden])');
+ assert.match(await page.locator('#parameter-tooltip').textContent(),/retained-bias norm.*omitted-bias norm/);await page.keyboard.press('Escape');
+ await page.fill('#rq-alpha','0.1');assert.equal(await page.locator('#rq-finalize').isDisabled(),false);
+ await page.fill('#rq-alpha','0.05');
+ const a=await finalize(preparation);assert.equal(a.reconstruction_id,preparation.reconstruction_id);assert.deepEqual(a.center,preparation.center);assert.equal(a.iteration,5);assert.equal(a.step.step_policy,'power_iteration_half_v1');assert.ok(a.step.power_relative_residual<=1e-8);
  await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'),{},{timeout:120000});
  assert.equal(await page.locator('#coverage-image').isVisible(),true);assert.match(await page.locator('#coverage-title').textContent(),/, 3 trials\)/);
  const studies=(await get('/api/validation-studies')).studies;const entry=studies.find(s=>s.plan.template_id===a.analysis_id);assert.ok(entry);
@@ -68,13 +79,13 @@ try{
  await page.selectOption('#rq-analyses','');await page.selectOption('#rq-analyses',a.analysis_id);
  await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'));
  assert.equal((await get('/api/validation-studies')).studies.length,studies.length);
- // An unavailable interval does not launch a study or reuse old coverage.
- await page.fill('#rq-eta','');const missing=await reconstruct();assert.equal(missing.lower,null);
- await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('Coverage unavailable'));
- assert.equal(await page.locator('#coverage-image').isVisible(),false);assert.equal((await get('/api/validation-studies')).studies.length,studies.length);
+ // Changing stage-one settings invalidates eta and stage two, without submitting validation.
+ await page.fill('#rq-k','6');assert.equal(await page.inputValue('#rq-eta'),'');assert.equal(await page.locator('#rq-finalize').isDisabled(),true);
+ await page.fill('#rq-k','5');assert.equal(await page.locator('#rq-finalize').isDisabled(),true);
  // No crossing is not silently replaced by the iteration cap.
- await page.fill('#rq-eta','0.1');await page.selectOption('#rq-mode','automatic');await page.fill('#rq-budget','1');
- const noCross=await reconstruct();assert.equal(noCross.status,'criterion_not_met');assert.equal(await page.locator('#rq-main-image').isVisible(),false);
+ await page.selectOption('#rq-mode','automatic');await page.fill('#rq-budget','1');
+ const noCross=await prepare();assert.equal(noCross.status,'criterion_not_met');assert.equal(await page.locator('#rq-results').isVisible(),false);
+ assert.equal(await page.locator('#rq-finalize').isDisabled(),true);
  assert.equal((await get('/api/validation-studies')).studies.length,studies.length);
  // Validation failure leaves the original reconstruction and intervals available.
  await page.route('**/api/validation-studies',route=>route.request().method()==='POST'?route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:{message:'Test work limit exceeded'}})}):route.continue());
@@ -85,5 +96,5 @@ try{
  await page.selectOption('#rq-analyses',a.analysis_id);await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'));
  await page.setViewportSize({width:540,height:900});await page.waitForTimeout(500);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
- assert.deepEqual(errors,[]);console.log('PASS saved coverage, unavailable intervals, no crossing, validation failure, mobile layout and no browser errors');
+ assert.deepEqual(errors,[]);console.log('PASS saved coverage, staged preparation and invalidation, no crossing, validation failure, mobile layout and no browser errors');
 }finally{await browser.close();}

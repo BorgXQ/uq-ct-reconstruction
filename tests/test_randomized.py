@@ -143,6 +143,33 @@ class RandomizedServiceTests(unittest.TestCase):
         self.assertNotEqual(a['center'],b['center'])
         c=self.run_random(source=source,eta=dict(value=2,provenance='Test'),alpha=.01,selection=dict(mode='automatic',budget=30))
         self.assertEqual(c['selected_k'],a['selected_k']);self.assertNotEqual(c['total_half_width'],a['total_half_width'])
+    def test_prepare_and_finalize_reuse_numerical_work(self):
+        request=self.rrequest(source=dict(M=8,nu=.5,provenance='Test'),eta=None,reference=True)
+        job=self.job('/api/randomized-preparations',request)
+        aid=job['result']['analysis_id'];a=self.c.get('/api/randomized-analyses/'+aid).json
+        self.assertEqual(a['workflow_phase'],'prepared');self.assertFalse(a['intervals_available'])
+        cal=a['eta_calibration'];self.assertIsNotNone(cal['eta'])
+        self.assertAlmostEqual(cal['eta'],cal['actual_omitted_bias_norm']/cal['actual_retained_bias_norm'])
+        with patch('ct_editor.randomized.service.randomized_crossing',side_effect=AssertionError('Repeated stopping')),patch('ct_editor.randomized.service.landweber',side_effect=AssertionError('Repeated reconstruction')),patch('ct_editor.randomized.service.evaluate',side_effect=AssertionError('Repeated covariance')):
+            out=self.job('/api/randomized-analyses/'+aid+'/finalize',dict(request_id='finalize',alpha=.01))
+        b=self.c.get('/api/randomized-analyses/'+out['result']['analysis_id']).json
+        self.assertEqual(a['center'],b['center']);self.assertEqual(a['variance'],b['variance']);self.assertEqual(a['step'],b['step'])
+        self.assertEqual(a['reconstruction_id'],b['reconstruction_id']);self.assertEqual(b['configuration']['eta']['value'],cal['eta'])
+        self.assertTrue(b['intervals_available']);self.assertEqual(b['configuration']['alpha'],.01)
+        np.testing.assert_allclose(b['total_half_width'],np.array(b['noise_half_width'])+(1+cal['eta'])*cal['retained_bound'])
+        # Preparation is immutable and does not gain intervals after finalization.
+        self.assertFalse(self.c.get('/api/randomized-analyses/'+aid).json['intervals_available'])
+
+    def test_preparation_uses_same_automatic_crossing(self):
+        settings=dict(source=dict(M=.0001,nu=.5,provenance='Test'),selection=dict(mode='automatic',budget=30))
+        reference=self.run_random(**settings)
+        result=self.job('/api/randomized-preparations',self.rrequest(**settings))
+        prepared=self.c.get('/api/randomized-analyses/'+result['result']['analysis_id']).json
+        self.assertEqual(prepared['selected_k'],reference['selected_k'])
+        self.assertEqual(prepared['center'],reference['center'])
+        self.assertEqual(prepared['variance'],reference['variance'])
+        self.assertIsNotNone(prepared['eta_calibration']['eta'])
+
     def test_power_step_shared_with_reference_and_validation(self):
         kwargs=dict(step_policy='power_iteration_half_v1',source=dict(M=8,nu=.5,provenance='Test'),eta=dict(value=.1,provenance='Test'))
         with patch.object(self.ex,'spectrum',side_effect=AssertionError('Hidden full SVD')):

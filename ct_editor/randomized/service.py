@@ -4,7 +4,7 @@ from time import perf_counter
 from uuid import uuid4
 import math
 import numpy as np
-from threadpoolctl import threadpool_limits
+from ..ct.parallel import numerical_threads
 from ..images import InputError
 from ..ct.geometry import fields,identifier,integer,scalar
 from ..ct.service import Record,digest
@@ -195,7 +195,7 @@ class RandomizedService:
         aid=uuid4().hex;inference=self.ct.inference(c['observation_id'])
         slots=['low_rank_factors','randomized_analyses']+([] if parent else ['reconstructions'])
         def work(job):
-            with threadpool_limits(limits=1,user_api='blas'):
+            with numerical_threads():
                 started=perf_counter();op,_=self.ct.operator(spec,job);sp,reference=self.reference(op,spec,c,job);step=self.step(op,sp,c,parent)
                 if c['selection']['mode']=='automatic' and not step['nonoscillatory_certified']:raise InputError('Automatic stopping requires a nonoscillatory certified step.')
                 factors=gaussian_factors(op,c['rank'],c['oversampling'],c['sketch_seed'],c['block_size'],job.check,job.progress)
@@ -291,7 +291,7 @@ class RandomizedService:
         spec=self.ct.specs[c['operator_id']];workspace,_=self.preflight(spec,c);vid=uuid4().hex
         factors=Factors(self.ct._get('low_rank_factors',base['factor_record_id']));inference=self.ct.inference(c['observation_id'])
         def work(job):
-            with threadpool_limits(limits=1,user_api='blas'):
+            with numerical_threads():
                 op,_=self.ct.operator(spec,job);sp,ref=self.reference(op,spec,c,job)
                 center=self.exact.center(parent,k,op,inference,job)
                 arrays,details=self.bundle(op,sp,factors,c,base['step'],k,center,base['probe_policy'],job)
@@ -314,7 +314,7 @@ class RandomizedService:
         truth=self.ct.snapshots.array(meta['snapshot_id']).ravel();did=uuid4().hex
         workspace,_=self.preflight(spec,{**c,'selection':dict(mode='fixed',iterations=k)})
         def work(job):
-            with threadpool_limits(limits=1,user_api='blas'):
+            with numerical_threads():
                 started=perf_counter();op,_=self.ct.operator(spec,job);sp,ref=self.reference(op,spec,c,job)
                 job.progress('Checking omitted bias on frozen truth',0,k)
                 bound=meta['retained_bias_allowance'];eta=c['eta']
@@ -353,7 +353,7 @@ class RandomizedService:
         workspace,_=self.preflight(spec,c)
         factors=Factors(self.ct._get('low_rank_factors',base['factor_record_id']));cid=uuid4().hex;inference=self.ct.inference(c['observation_id'])
         def work(job):
-            with threadpool_limits(limits=1,user_api='blas'):
+            with numerical_threads():
                 op,_=self.ct.operator(spec,job);sp,_=self.exact.spectrum(op,job);step=base['step']
                 start=perf_counter()
                 exact=first_crossing(sp,step,c['sigma'],c['source'],data['bound_method'],c0,budget,job.check,job.progress)

@@ -1,7 +1,7 @@
 """Truth-only evidence. Never recalibrates or modifies an inference result."""
 import math
 import numpy as np
-from threadpoolctl import threadpool_limits
+from ..ct.parallel import numerical_threads
 from ..ct.solver import frozen_array
 
 
@@ -10,7 +10,7 @@ def source_check(spectrum, truth, source):
     meta=spectrum.metadata();V=spectrum.vectors;lam=spectrum.eigenvalues
     resolved=spectrum.singular_values>meta['rank_tolerance']
     norm=float(np.linalg.norm(truth));tolerance=1e-10*max(1,norm)
-    with threadpool_limits(limits=1,user_api='blas'):
+    with numerical_threads():
         coefficients=V.T@truth
         residual=truth-V[:,resolved]@coefficients[resolved]
         outside=truth-V@coefficients

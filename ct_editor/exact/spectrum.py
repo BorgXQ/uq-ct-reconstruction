@@ -5,7 +5,7 @@ from time import perf_counter
 
 import numpy as np
 from scipy.linalg import svd
-from threadpoolctl import threadpool_limits
+from ..ct.parallel import numerical_threads
 
 from ..images import InputError
 from ..ct.service import digest
@@ -48,7 +48,7 @@ def decompose(operator, check=lambda: None, progress=lambda *args: None, rank_mu
     started = perf_counter()
     sparse = operator.sparse_copy()
     m, n = sparse.shape
-    with threadpool_limits(limits=1, user_api='blas'):
+    with numerical_threads():
         dense = sparse.toarray()
         try:
             u, singular, vt = svd(dense, full_matrices=False, lapack_driver='gesdd', check_finite=True)

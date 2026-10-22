@@ -3,7 +3,7 @@ from collections import OrderedDict
 import math
 import numpy as np
 from scipy.linalg import eigh
-from threadpoolctl import threadpool_limits
+from ..ct.parallel import numerical_threads
 from ..ct.geometry import fields, identifier, scalar
 
 
@@ -54,7 +54,7 @@ class SourceCalibration:
                 op,_=self.ct.operator(spec,job);truth=self.ct.snapshots.array(sid).ravel()
                 invisible=float(np.linalg.norm(truth[np.asarray(op._matrix.sum(axis=0)).ravel()==0]))
                 normal=np.empty((n,n),dtype=float,order='F')
-                with threadpool_limits(limits=1,user_api='blas'):
+                with numerical_threads():
                     for start in range(0,n,32):
                         job.check();size=min(32,n-start);basis=np.zeros((n,size));basis[start+np.arange(size),np.arange(size)]=1
                         normal[:,start:start+size]=op.adjoint_block(op.forward_block(basis))

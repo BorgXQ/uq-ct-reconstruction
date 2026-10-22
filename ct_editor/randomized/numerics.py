@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from time import perf_counter
 import numpy as np
 from scipy.linalg import svd, eigh
-from threadpoolctl import threadpool_limits
+from ..ct.parallel import numerical_threads
 from ..images import InputError
 from ..ct.geometry import integer, scalar
 from ..ct.service import Record, digest
@@ -79,7 +79,7 @@ def gaussian_factors(op,r,p,seed,block=8,check=lambda:None,progress=lambda *a:No
     for start in range(0,ell,block):
         end=min(start+block,ell);Y[:,start:end]=normal(samples(n,end-start,seed,1,start))
         progress('Sampling Gaussian subspace',end,ell)
-    with threadpool_limits(limits=1,user_api='blas'):
+    with numerical_threads():
         check();progress('Orthonormalizing sketch',0,None)
         # Thin SVD of n×ell sampled range only; never SVD of A or dense B.
         q,s,_=svd(Y,full_matrices=False,check_finite=False)

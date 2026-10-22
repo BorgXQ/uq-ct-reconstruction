@@ -2,7 +2,7 @@
 import math
 import numpy as np
 from scipy.stats import norm
-from threadpoolctl import threadpool_limits
+from ..ct.parallel import numerical_threads
 from ..images import InputError
 from ..ct.geometry import fields, scalar, integer, identifier
 from ..ct.jobs import Canceled
@@ -82,7 +82,7 @@ def covariance(spectrum, omega, k, sigma):
     warnings = []
     if sigma > 0 and k > 0 and np.any((spectrum.eigenvalues > 0) & (weights == 0)):
         warnings.append('Positive covariance contribution underflowed; numerical zero is not an exact-zero certificate.')
-    with threadpool_limits(limits=1, user_api='blas'):
+    with numerical_threads():
         diagonal = spectrum.squared_vectors @ weights
     sd = np.sqrt(diagonal)
     return dict(variance=frozen_array(diagonal), pixel_sd=frozen_array(sd), trace=float(np.sum(weights)),
@@ -144,7 +144,7 @@ def first_crossing(spectrum, step, sigma, source, method, c0, budget, check=lamb
     c0=scalar(c0,'c0');integer(budget,'budget',1,None)
     if c0<=0: raise InputError('c0 must be positive.','c0')
     history=[];c=np.zeros_like(spectrum.eigenvalues);g=1-step['omega']*spectrum.eigenvalues
-    with threadpool_limits(limits=1,user_api='blas'):
+    with numerical_threads():
         for k in range(1,budget+1):
             try: check()
             except Canceled:

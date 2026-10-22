@@ -1,9 +1,5 @@
 // Parameter explanations are presentation only; no settings or claims are changed.
 const help={
-  shade:'Drawing intensity from 0 (black) to 255 (white). Numerical density is intensity / 255.',
-  'shade-slider':'Select the same drawing intensity as the numeric shade field: density = shade / 255.',
-  thickness:'Brush, eraser, or shape-outline thickness in source-image pixels.',
-  'shape-mode':'Filled paints the shape interior. Outline paints only its boundary.',
   resolution:'Number of pixels per side in the numerical image. Larger grids preserve more detail but increase reconstruction and uncertainty work.',
   snapshots:'Choose an immutable frozen image. Later drawing edits do not change it.',
   grid:'Show numerical pixel boundaries in the preview; this does not alter the image.',

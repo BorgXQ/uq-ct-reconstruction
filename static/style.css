@@ -84,3 +84,9 @@
 .diagnostic-scale{text-align:center;font-size:12px}
 .diagnostic-pixel{font-size:12px;min-height:5em}
 @media(max-width:900px){.coverage-diagnostic-grid{grid-template-columns:1fr}}
+
+/* Match Draw card heights, including when stacked on narrow screens. */
+#draw-workspace .draw-grid {grid-auto-rows:1fr}
+#draw-workspace .draw-grid > .panel {height:100%}
+#paint-controls .palette {margin:12px 0 6px}
+#paint-controls .palette button[aria-pressed=true] {background:rgb(var(--shade) var(--shade) var(--shade));outline:2px solid var(--accent);outline-offset:2px}

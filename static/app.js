@@ -120,7 +120,7 @@ $('freeze').onclick = async () => {
   } catch(error) { $('freeze-status').textContent = 'Freeze failed. Previous snapshots preserved; use Freeze image to retry.'; report(error.message); }
   finally { freezing = false; controls(); }
 };
-const hints = {brush:'Drag to paint. Click for a round dab. Escape cancels a gesture.', eraser:'Paints black with the selected thickness. Your painting shade is preserved.', circle:'Press at the center, then drag outward to set the radius. Escape cancels.'};
+const hints = {brush:'Drag to paint. Click for a round dab. Escape cancels a gesture.', eraser:'Paints black. Your painting shade is preserved.', circle:'Press at the center, then drag outward to set the radius. Escape cancels.'};
 document.querySelectorAll('[data-tool]').forEach(button => button.onclick = () => {
   if(busy) return;
   editor.settings.tool = button.dataset.tool;
@@ -128,23 +128,14 @@ document.querySelectorAll('[data-tool]').forEach(button => button.onclick = () =
   $('tool-hint').textContent = hints[button.dataset.tool];
 });
 function setShade(shade) {
-  editor.settings.shade = shade; $('shade').value = $('shade-slider').value = shade;
-  $('swatch').style.background = `rgb(${shade} ${shade} ${shade})`;
+  editor.settings.shade = shade;
+  document.querySelectorAll('[data-shade]').forEach(button=>{
+    button.setAttribute('aria-pressed',Number(button.dataset.shade)===shade);
+    button.setAttribute('aria-label',`Shade ${button.dataset.shade} of 255`);
+  });
   $('shade-value').textContent = `${shade} / 255 ≈ ${(shade/255).toFixed(6)}`;
 }
-function integerControl(id, key, min, max, callback) {
-  $(id).addEventListener('change', () => {
-    const text = $(id).value, value = Number(text);
-    if (text.trim() === '' || !Number.isInteger(value) || value < min || value > max) {
-      $(id).value = editor.settings[key]; report(`${id}: enter an integer from ${min} to ${max}.`); return;
-    }
-    editor.settings[key] = value; callback?.(value);
-  });
-}
-integerControl('shade','shade',0,255,setShade); integerControl('thickness','thickness',1,128);
-$('shade-slider').oninput = () => setShade(Number($('shade-slider').value));
 document.querySelectorAll('[data-shade]').forEach(button => button.onclick = () => setShade(Number(button.dataset.shade)));
-$('shape-mode').onchange = () => { editor.settings.mode = $('shape-mode').value; };
 for(const name of ['undo','redo','clear']) $(name).onclick = () => editor.action(name);
 window.addEventListener('keydown', e => {
   if (e.target.closest('input,textarea,select,[contenteditable=true]')) return;
@@ -161,3 +152,5 @@ $('refresh-snapshots').onclick = async () => {
 };
 $('retry').onclick = preview; $('grid').onchange = overlay;
 setShade(255); controls(); preview(); refreshSnapshots().catch(error => report(`Snapshot list unavailable: ${error.message}`));
+
+$('load-phantom').onclick=()=>{mode='draft';editor.action('phantom');render();};

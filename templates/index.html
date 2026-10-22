@@ -8,10 +8,10 @@
 <div class="workspace draw-grid">
 <section class="panel"><div class="panel-title"><div><span class="eyebrow">EDITABLE SOURCE</span><h2>Draw your object</h2></div><span class="tag">512 × 512</span></div>
 <fieldset id="paint-controls"><legend>Drawing tools</legend>
+<button id="load-phantom" type="button">Load modified Shepp–Logan phantom</button><p class="hint">Replaces the drawing; Undo restores it. Editable 8-bit source, averaged to the selected numerical grid when frozen.</p>
 <div class="tools" role="group" aria-label="Drawing tool"><button data-tool="brush" aria-pressed="true">Brush</button><button data-tool="eraser" aria-pressed="false">Eraser</button><button data-tool="circle" aria-pressed="false">Circle</button></div>
-<div class="settings"><label>Shade <span id="swatch" aria-hidden="true"></span><input id="shade" type="number" min="0" max="255" value="255"></label><label class="slider-label">Shade slider<input aria-label="Shade slider" id="shade-slider" type="range" min="0" max="255" value="255"></label><output id="shade-value">255 / 255 = 1</output></div>
 <div class="palette" aria-label="Quick grayscale palette"><button data-shade="0" style="--shade:0">0</button><button data-shade="64" style="--shade:64">64</button><button data-shade="128" style="--shade:128">128</button><button data-shade="192" style="--shade:192">192</button><button data-shade="255" style="--shade:255">255</button></div>
-<div class="settings"><label>Thickness <input id="thickness" type="number" min="1" max="128" value="16"><small>source pixels</small></label><label>Shape mode<select id="shape-mode"><option value="filled">Filled</option><option value="outline">Outline</option></select></label></div>
+<output id="shade-value" aria-live="polite">255 / 255 = 1</output>
 </fieldset>
 <p id="tool-hint" class="hint">Drag to paint. Click for a round dab. Escape cancels a gesture.</p>
 <canvas id="editor" width="512" height="512" tabindex="0" aria-label="Editable grayscale drawing, 512 by 512"></canvas>

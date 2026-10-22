@@ -92,7 +92,7 @@ def validate_step(operator, omega, certificate=None):
 
 
 def landweber(operator, y, omega, iterations, cancel=lambda:False, emit=lambda *args:None, *, step_certificate=None, retain_history=True):
-    integer(iterations,'iterations',1,5000)
+    integer(iterations,'iterations',1,None)
     y=frozen_array(y)
     if y.shape!=(operator.shape[0],): raise InputError('Observation shape mismatch.',code='incompatible_dimensions')
     validate_step(operator,omega,step_certificate)

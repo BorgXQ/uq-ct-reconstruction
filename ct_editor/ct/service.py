@@ -170,7 +170,7 @@ class CTService:
     def reconstruct(self,data):
         fields(data,('request_id','observation_id','iterations','step'),('request_id','observation_id','iterations','step'))
         rid=identifier(data['request_id'],'request_id');oid=identifier(data['observation_id'],'observation_id')
-        K=integer(data['iterations'],'iterations',1,5000);observation=self._get('observations',oid);om=observation.meta()
+        K=integer(data['iterations'],'iterations',1,None);observation=self._get('observations',oid);om=observation.meta()
         acquisition=self._get('acquisitions',om['acquisition_id']);am=acquisition.meta();spec=self.specs[om['operator_id']]
         class NormInfo:
             def metadata(self): return am['operator']

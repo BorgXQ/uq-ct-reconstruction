@@ -44,12 +44,12 @@ def validate_plan(p,c,n):
     choices(p['diagnostics'],('none','representative','all'),'diagnostics')
     integer(p['trials'],'trials',1,10000);integer(p['root_seed'],'root_seed',0,2**32-1)
     integer(p['configuration_index'],'configuration_index',0,15)
-    integer(p['iterations'],'iterations',1,5000);integer(p['budget'],'budget',1,5000)
+    integer(p['iterations'],'iterations',1,None);integer(p['budget'],'budget',1,None)
     if not 0<scalar(p['c0'],'c0'):raise InputError('c0 must be positive.')
     quantile(p['mc_alpha']);quantile(c['alpha']);scalar(c['sigma'],'sigma')
     if not isinstance(p['methods'],list) or not p['methods'] or len(p['methods'])>4 or len(set(p['methods']))!=len(p['methods']):raise InputError('Choose distinct supported methods.')
     for m in p['methods']:choices(m,METHODS,'method')
-    for key,limit,maximum in [('pixels',16,n-1),('representatives',8,p['trials']-1),('diagnostic_iterations',32,5000)]:
+    for key,limit,maximum in [('pixels',16,n-1),('representatives',8,p['trials']-1),('diagnostic_iterations',32,None)]:
         values=p[key]
         if not isinstance(values,list) or len(values)>limit or len(set(values))!=len(values):raise InputError(f'Invalid {key}.')
         for value in values:integer(value,key,1 if key=='diagnostic_iterations' else 0,maximum)
@@ -71,7 +71,7 @@ class ValidationService:
     def __init__(self,randomized,config):
         self.randomized=randomized;self.exact=randomized.exact;self.ct=randomized.ct;self.lock=RLock()
         self.records={};self.pending={};self.grids={};self.replays={};self.leases=[]
-        self.limit=config.get('VALIDATION_LIMIT',24);self.max_work=config.get('VALIDATION_MAX_WORK',1_000_000_000_000)
+        self.limit=config.get('VALIDATION_LIMIT',24)
         self.max_trials=config.get('VALIDATION_MAX_TOTAL_TRIALS',10000)
         self.directory=Path(config.get('VALIDATION_ARTIFACT_DIR','.artifacts')).resolve();self.directory.mkdir(parents=True,exist_ok=True)
         self.disk_limit=config.get('VALIDATION_DISK_BYTES',512*1024**2)
@@ -118,7 +118,7 @@ class ValidationService:
         work+=m*(2*spec.resolution+1)*(K*(3*diag_count+len(p['methods']))+sum(p['diagnostic_iterations']))*2
         retained=n*len(p['methods'])*200+p['trials']*len(p['methods'])*(8000+len(p['pixels'])*700)+len(p['representatives'])*(m*16+n*96*len(p['methods']))
         workspace+=retained*2+4*1024**2
-        if p['trials']>self.max_trials or work>self.max_work:raise InputError(f'Total study work estimate {work:,} exceeds limit {self.max_work:,}. Reduce trials, iterations, geometry or probes explicitly.',code='resource_limit',status=507)
+        if p['trials']>self.max_trials:raise InputError(f'Trial count exceeds limit {self.max_trials:,}.',code='resource_limit',status=507)
         if workspace>self.ct.budget.limit:raise InputError('Study exceeds shared memory limit.',code='resource_limit',status=507)
         return dict(estimated_scalar_work=work,workspace_bytes=workspace,retained_estimate_bytes=retained,reference_reason=exact_reason,
             note='Conservative work estimate, not a predicted runtime; shared center work is reused.')
@@ -207,7 +207,7 @@ class ValidationService:
             else:c[axis]=value
             validate_plan(p,c,spec.shape[1]);e=self.estimate(p,c,spec);total+=e['estimated_scalar_work'];peak=max(peak,e['workspace_bytes'])
             rows.append((p,c,spec,step,e))
-        if total>self.max_work or len(rows)*base['trials']>self.max_trials:raise InputError('Total parameter grid exceeds study budget.',code='resource_limit',status=507)
+        if len(rows)*base['trials']>self.max_trials:raise InputError('Total parameter grid exceeds study budget.',code='resource_limit',status=507)
         accepted=digest(dict(base=data['base'],axis=axis,values=values));summary=dict(axis=axis,values=values,accepted_hash=accepted,total_work=total,
             configurations=[dict(index=i,configuration=c,plan=p,estimate=e) for i,(p,c,_,_,e) in enumerate(rows)])
         if preview:return summary

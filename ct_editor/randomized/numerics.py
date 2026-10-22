@@ -119,7 +119,7 @@ def retained_action(factors,omega,k,sigma,x):
 
 def direct_covariance(op,omega,k,sigma,x,check=lambda:None):
     """S_k B S_k reference, supports a vector or bounded block."""
-    integer(k,'iteration',0,5000);scalar(sigma,'sigma')
+    integer(k,'iteration',0,None);scalar(sigma,'sigma')
     x=np.asarray(x,dtype=float)
     if x.ndim not in (1,2) or x.shape[0]!=op.shape[1] or not np.isfinite(x).all(): raise InputError('Invalid covariance action vector/block.')
     if not math.isfinite(omega) or omega<=0: raise InputError('Invalid covariance step.')

@@ -26,14 +26,13 @@ class ExactService:
         self.cache=OrderedDict();self.cache_bytes=0
         self.cache_limit=config.get('EXACT_SPECTRUM_CACHE_BYTES',64*1024**2)
         self.max_elements=config.get('EXACT_MAX_DENSE_ELEMENTS',8_000_000)
-        self.max_search_work=config.get('EXACT_MAX_SEARCH_WORK',6_000_000_000)
 
     def preflight(self,spec,budget):
         m,n=spec.shape
         if spec.resolution not in (16,32):
             raise InputError('Full-spectrum baseline supports 16×16 and 32×32. This observation remains usable in M2; no downsampling was performed.',code='unsupported_exact_size',status=422)
-        if m*n>self.max_elements or n*min(m,n)*budget>self.max_search_work:
-            raise InputError('Exact dense/work limit exceeded; select a smaller acquisition explicitly.',code='resource_limit',status=507)
+        if m*n>self.max_elements:
+            raise InputError('Exact dense matrix storage limit exceeded; select a smaller acquisition explicitly.',code='resource_limit',status=507)
         return workspace_bytes(m,n,budget)+spec.estimate_bytes()
 
     def spectrum(self,op,job):
@@ -81,13 +80,13 @@ class ExactService:
                 fields(sel,('mode','iterations','provenance'),('mode','iterations','provenance'))
                 if sel['provenance'] not in ('fixed_predeclared','retrospective_inspection','imported_selection_unknown'):
                     raise InputError('Unsupported selection provenance.')
-                selection=dict(mode='fixed',iterations=integer(sel['iterations'],'iterations',1,5000),provenance=sel['provenance'])
+                selection=dict(mode='fixed',iterations=integer(sel['iterations'],'iterations',1,None),provenance=sel['provenance'])
             elif sel.get('mode')=='automatic':
                 fields(sel,('mode','budget','c0'),('mode','budget','c0'))
                 c0=scalar(sel['c0'],'c0')
                 if c0<=0: raise InputError('c0 must be positive.','c0')
                 if source is None: raise InputError('Automatic stopping requires source parameters.',code='source_missing',status=422)
-                selection=dict(mode='automatic',budget=integer(sel['budget'],'budget',1,5000),c0=c0,provenance='exact_first_crossing')
+                selection=dict(mode='automatic',budget=integer(sel['budget'],'budget',1,None),c0=c0,provenance='exact_first_crossing')
             else: raise InputError('Choose fixed or automatic selection.','mode')
         observation=self.ct._get('observations',oid).meta();spec=self.ct.specs[observation['operator_id']]
         acquisition=self.ct._get('acquisitions',observation['acquisition_id']).meta()

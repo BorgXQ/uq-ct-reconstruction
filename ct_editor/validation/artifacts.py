@@ -153,7 +153,7 @@ def validate_result(r):
         if row['method'] not in counts or key in seen:raise ValueError('Duplicate/incompatible trial')
         seen.add(key);counter=counts[row['method']];counter['terminal']+=1
         if row['status'] in ('completed_interval','completed_moments_only'):
-            integer(row['k'],'k',1,5000);counter['centers']+=1
+            integer(row['k'],'k',1,None);counter['centers']+=1
         if row['status']=='completed_interval':counter['intervals']+=1
     for method in p['methods']:
         s=r['summaries'][method];a=r['maps'][method];ct=counts[method]

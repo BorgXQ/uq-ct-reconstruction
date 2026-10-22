@@ -24,9 +24,10 @@ def native_detector_offsets(resolution):
     return np.arange(-radius, radius + 1, dtype=np.float64)
 
 
-def integer(value, name, low, high):
-    if type(value) is not int or not low <= value <= high:
-        raise InputError(f'{name} must be an integer from {low} to {high}.', name)
+def integer(value, name, low, high=None):
+    if type(value) is not int or value < low or (high is not None and value > high):
+        requirement=f'from {low} to {high}' if high is not None else f'at least {low}'
+        raise InputError(f'{name} must be an integer {requirement}.', name)
     return value
 
 

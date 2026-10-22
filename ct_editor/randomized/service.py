@@ -23,7 +23,6 @@ class RandomizedService:
         self.exact=exact;self.ct=exact.ct
         for table,limit in [('low_rank_factors',32),('randomized_analyses',32),('randomized_views',64),('approximation_diagnostics',32),('stopping_comparisons',16)]:
             self.ct.records[table]={};self.ct.pending[table]=0;self.ct.limits[table]=config.get(table.upper()+'_LIMIT',limit)
-        self.max_work=config.get('RANDOMIZED_MAX_WORK',1_000_000_000_000)
 
     def capture(self,data,exact_id=None,recid=None):
         common=('request_id','rank','oversampling','sketch_seed','probe_seed','probe_count','block_size','epsilon','delta','eta','backend','reference')
@@ -51,10 +50,10 @@ class RandomizedService:
             if not isinstance(selection,dict):raise InputError('Expected a selection object.','selection')
             if selection.get('mode')=='automatic':
                 fields(selection,('mode','budget'),('mode','budget'))
-                integer(selection['budget'],'budget',1,5000);selection['provenance']='randomized_first_crossing'
+                integer(selection['budget'],'budget',1,None);selection['provenance']='randomized_first_crossing'
             elif selection.get('mode')=='fixed':
                 fields(selection,('mode','iterations','provenance'),('mode','iterations','provenance'))
-                integer(selection['iterations'],'iterations',1,5000)
+                integer(selection['iterations'],'iterations',1,None)
             else:raise InputError('Choose fixed or automatic selection.')
             if config['step_policy'] not in ('safe_induced_norm_v1','exact_spectral_half','power_iteration_half_v1'):raise InputError('Unsupported fixed-step policy.')
         if parent:
@@ -97,7 +96,6 @@ class RandomizedService:
         work=normal_columns*m*(2*spec.resolution+1)+2*n*c['rank']*N*evaluations
         if c['backend']=='full_spectrum_reference' and c['sigma']:
             work+=2*n*min(m,n)*N*evaluations
-        if work>self.max_work:raise InputError(f'Randomized operator-work estimate {work:,} exceeds {self.max_work:,}. Explicitly reduce acquisition, probes or iteration budget.',code='resource_limit',status=507)
         workspace=spec.estimate_bytes()+8*(8*n*ell+8*ell*ell+8*n*N+4*m*block+180*n)+4096*k+2**20
         mandatory=c['backend']=='full_spectrum_reference' or c['step_policy']=='exact_spectral_half'
         reference=None
@@ -191,7 +189,6 @@ class RandomizedService:
         if prepare:
             kmax=c['selection'].get('budget',c['selection'].get('iterations',0))
             extra=2*kmax*spec.shape[0]*(2*spec.resolution+1)
-            if cost['estimated_scalar_work']+extra>self.max_work:raise InputError('Preparation and bias calibration exceed the operator-work limit.',code='resource_limit',status=507)
             cost['estimated_scalar_work']+=extra
             workspace+=spec.shape[1]*8*8+spec.shape[0]*2*8
             cost['workspace_bytes']=workspace
@@ -348,7 +345,7 @@ class RandomizedService:
     def own_stopping(self,aid,data):
         data=deepcopy(data)
         fields(data,('request_id','budget','c0','bound_method'),('request_id','budget','c0','bound_method'))
-        rid=identifier(data['request_id'],'request_id');budget=integer(data['budget'],'budget',1,5000);c0=scalar(data['c0'],'c0')
+        rid=identifier(data['request_id'],'request_id');budget=integer(data['budget'],'budget',1,None);c0=scalar(data['c0'],'c0')
         if c0<=0:raise InputError('c0 must be positive.')
         base=self.ct._get('randomized_analyses',aid).meta();c=deepcopy(base['configuration'])
         if not base.get('factor_record_id') or c['source'] is None:raise InputError('Completed factors and source are required.')

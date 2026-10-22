@@ -57,7 +57,7 @@ def compatible_bound(method, step):
 def filters(eigenvalues, omega, k):
     """Returns c=omega sum g^j and a=lambda*c², including negative g and tiny lambda."""
     values = np.asarray(eigenvalues, dtype=float)
-    integer(k,'iteration',0,5000)
+    integer(k,'iteration',0,None)
     if np.any(values < 0) or not np.isfinite(values).all(): raise InputError('Invalid eigenvalues.')
     t = omega*values
     if np.any(t >= 2) or omega <= 0: raise InputError('Unstable spectral filter.', code='invalid_step', status=422)
@@ -141,7 +141,7 @@ def first_crossing(spectrum, step, sigma, source, method, c0, budget, check=lamb
     if source is None: raise InputError('Automatic stopping requires an explicit source declaration.',code='source_missing',status=422)
     if not step['nonoscillatory_certified']: raise InputError('Automatic route requires a nonoscillatory step.',code='invalid_step',status=422)
     compatible_bound(method,step)
-    c0=scalar(c0,'c0');integer(budget,'budget',1,5000)
+    c0=scalar(c0,'c0');integer(budget,'budget',1,None)
     if c0<=0: raise InputError('c0 must be positive.','c0')
     history=[];c=np.zeros_like(spectrum.eigenvalues);g=1-step['omega']*spectrum.eigenvalues
     with threadpool_limits(limits=1,user_api='blas'):

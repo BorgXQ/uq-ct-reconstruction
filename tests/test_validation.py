@@ -95,7 +95,7 @@ class ValidationTests(unittest.TestCase):
     def test_plan_validation_and_limits(self):
         for updates in [dict(trials=True),dict(pixels=[9999]),dict(methods=[]),dict(trials=10001),dict(mc_alpha=0)]:
             response=self.c.post('/api/validation-studies',json=self.request(**updates));self.assertEqual(response.status_code,400,response.json)
-        with patch.object(self.v,'max_work',1):self.assertEqual(self.c.post('/api/validation-studies/preflight',json=self.request()).status_code,507)
+        with patch.object(self.v,'max_work',1,create=True):self.assertEqual(self.c.post('/api/validation-studies/preflight',json=self.request(iterations=6000,budget=6000)).status_code,200)
     def test_bundle_restore_restart_and_replay(self):
         r=self.study(trials=2,representatives=[0],methods=['corrected']);sid=r['study_id']
         exp=self.job('/api/exports',dict(request_id='export',study_id=sid,profile='numerical'));response=self.c.get(exp['download']);raw=response.data;response.close()

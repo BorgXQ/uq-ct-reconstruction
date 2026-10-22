@@ -16,6 +16,13 @@ from test_ct import terminal
 
 
 class RandomizedNumericalTests(unittest.TestCase):
+    def test_iterations_above_old_cap(self):
+        from ct_editor.exact.numerics import filters
+        op,sp,_=prepare(np.diag([1.,2.]))
+        _,weights=filters(sp.eigenvalues,.1,6000)
+        np.testing.assert_allclose(weights,1/sp.eigenvalues,rtol=1e-12)
+        np.testing.assert_allclose(direct_covariance(op,.1,6000,.2,np.ones(2)),[.04,.01],atol=1e-12)
+
     def test_tsvd_fixture(self):
         op,sp,_=prepare(np.diag([2.,1.,0.]));M=np.sqrt(5)/8
         arrays,meta=tsvd_split(sp,.125,2,.1,dict(M=M,nu=1),1)
@@ -205,7 +212,8 @@ class RandomizedServiceTests(unittest.TestCase):
         no=self.run_random(source=dict(M=100,nu=.5,provenance='Test'),selection=dict(mode='automatic',budget=2))
         self.assertEqual(no['status'],'criterion_not_met');self.assertIsNone(no['selected_k']);self.assertIsNone(no['center'])
         self.app.extensions['randomized_service'].max_work=1
-        self.assertEqual(self.c.post('/api/randomized-analyses',json=self.rrequest()).status_code,507)
+        # Legacy work-limit attributes no longer reject jobs.
+        self.job('/api/randomized-analyses',self.rrequest())
         self.assertEqual(a,self.c.get('/api/randomized-analyses/'+a['analysis_id']).json)
 
     def test_matrix_free_64_zero_noise_and_reference_unavailable(self):

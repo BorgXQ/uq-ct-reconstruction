@@ -12,9 +12,10 @@
     <details id="rq-source-options"><summary>Source assumptions &amp; confidence level</summary>
       <div class="settings" id="rq-source-fields">
         <label>Exponent (ν)<input id="rq-nu" type="number" min="0" step="any" value="0.5" required></label>
-        <label>Source bound (M)<input id="rq-M" type="number" min="0" step="any" value="8" required></label>
+        <label>M calibrated from drawing<input id="rq-M" type="number" min="0" step="any" readonly aria-describedby="rq-source-status"></label>
         <label>Tail probability (α)<input id="rq-alpha" type="number" min="0" max="1" step="any" value="0.05" required></label>
       </div>
+    <p id="rq-source-status" role="status">Select an acquisition to check the source condition.</p><button id="rq-source-retry" type="button">Recheck source condition</button>
     </details>
     <details id="rq-approx-options"><summary>Approximation settings</summary><div class="settings">
       <label>Retained rank (r)<input id="rq-rank" type="number" min="1" max="512" value="128" required></label>

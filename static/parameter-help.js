@@ -20,7 +20,7 @@ const help={
   'rq-budget':'Largest K searched for B̃ₖ ≤ vₖ. Default 1500; the search may stop earlier. This is a limit, not a target iteration count.',
   'rq-k':'Number of Landweber iterations when stopping mode is NONE. Default 500. More iterations can recover detail but amplify measurement noise.',
   'rq-nu':'Source exponent in x† = (AᵀA)ᵛw. Larger ν imposes a stronger restriction on truth in poorly measured directions; it is an assumption, not automatically verified.',
-  'rq-M':'Source bound: ‖w‖₂ ≤ M in x† = (AᵀA)ᵛw. Larger M increases the bias allowance. Its validity depends on the image and operator units.',
+  'rq-M':'Read-only source norm calibrated from the frozen drawing and acquisition for the chosen ν. Numerical source compatibility does not establish the retained- or omitted-bias assumptions.',
   'rq-alpha':'Gaussian tail probability. α = 0.05 gives a nominal 95% interval; α = 0.01 gives 99%. Smaller α widens the Gaussian allowance. Coverage still depends on the stated assumptions.',
   'rq-rank':'Number r of retained normal-operator directions for uncertainty approximation. Defaults: 32 at 16², 64 at 32², 128 at 64². Landweber still uses the full operator.',
   'rq-p':'Additional random sketch directions beyond r. The sketch width is r + p; more oversampling can improve the approximation but costs work.',

@@ -1,3 +1,4 @@
+import {observationChanged,sourceReady,calibratedSource} from './source-calibration.js';
 import {runCoverage,restoreCoverage,clearCoverage} from './validation.js';
 import {rowPlot} from './validation-presentation.js';
 import {api,get,watch} from './ct.js';
@@ -16,7 +17,8 @@ function controls(){
   const o=observations.find(o=>o.observation_id===$('rq-observation').value);
   if(o&&o.resolution!==rankResolution){$('rq-rank').value=({16:32,32:64,64:128})[o.resolution]??Math.min(128,o.resolution*2);rankResolution=o.resolution;}
   $('rq-context').textContent=o?`${o.resolution} × ${o.resolution}; observation ${o.observation_id.slice(0,8)}; noise SD ${o.noise.sigma}.`:'Select an observation from Measure.';
-  $('rq-submit').disabled=!o;$('rq-submit').textContent='Run reconstruction';
+  $('rq-submit').disabled=!o||!sourceReady();$('rq-submit').textContent='Run reconstruction';
+  observationChanged(controls);
   if(base)$('rq-mismatch').textContent=signature===formSignature()?'Displayed result matches submitted controls.':'Displayed result keeps its captured settings. Recalculate to apply current controls.';
 }
 async function lists(){
@@ -31,7 +33,7 @@ function request(){
   const body={request_id:uid(),rank:num('rq-rank'),oversampling:num('rq-p'),sketch_seed:num('rq-sketch'),probe_seed:num('rq-probe'),probe_count:num('rq-count'),block_size:num('rq-block'),epsilon:num('rq-epsilon'),delta:num('rq-delta'),backend:'matrix_free',reference:true,
     eta:$('rq-eta').value.trim()===''?null:{value:num('rq-eta'),provenance:'User-specified omitted-bias assumption; not verified.'}};
   return ['/api/randomized-analyses',{...body,observation_id:$('rq-observation').value,step_policy:'power_iteration_half_v1',alpha:num('rq-alpha'),settings_origin:'unverified',declaration:'User-specified settings; noise independence has not been established.',
-    source:{M:num('rq-M'),nu:num('rq-nu'),provenance:'User-specified source assumption; not verified against the drawing.'},
+    source:calibratedSource(),
     selection:$('rq-mode').value==='automatic'?{mode:'automatic',budget:num('rq-budget')}:{mode:'fixed',iterations:num('rq-k'),provenance:'imported_selection_unknown'}}];
 }
 $('rq-form').onsubmit=guarded(async e=>{

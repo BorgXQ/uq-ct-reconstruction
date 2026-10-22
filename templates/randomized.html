@@ -1,6 +1,7 @@
 <section class="panel" id="randomized-panel">
   <span class="eyebrow">03 / RECONSTRUCT</span><span id="uq-state" class="tag">not_ready</span>
   <h2>Reconstruction settings</h2>
+  <h3>1. Select K and calibrate η</h3>
   <form id="rq-form">
     <div class="settings"><label id="rq-observation-label">Observation<select id="rq-observation"><option value="">Select an observation</option></select></label></div>
     <p id="rq-context" class="hint">Select a measured observation.</p>
@@ -9,30 +10,34 @@
       <label id="rq-budget-label">Max iterations (K)<input id="rq-budget" type="number" min="1" max="5000" value="1500" required></label>
       <label id="rq-k-label" hidden>Fixed iterations (K)<input id="rq-k" type="number" min="1" max="5000" value="500" disabled></label>
     </div></div>
-    <details id="rq-source-options"><summary>Source assumptions &amp; confidence level</summary>
+    <section id="rq-source-options" class="rq-settings-box"><h4>Source assumption</h4>
       <div class="settings" id="rq-source-fields">
         <label>Exponent (ν)<input id="rq-nu" type="number" min="0" step="any" value="0.5" required></label>
         <label>M calibrated from drawing<input id="rq-M" type="number" min="0" step="any" readonly aria-describedby="rq-source-status"></label>
-        <label>Tail probability (α)<input id="rq-alpha" type="number" min="0" max="1" step="any" value="0.05" required></label>
       </div>
     <p id="rq-source-status" role="status">Select an acquisition to check the source condition.</p><button id="rq-source-retry" type="button">Recheck source condition</button>
-    </details>
-    <details id="rq-approx-options"><summary>Approximation settings</summary><div class="settings">
+    </section>
+    <section id="rq-approx-options" class="rq-settings-box"><h4>Approximation settings</h4><div class="settings">
       <label>Retained rank (r)<input id="rq-rank" type="number" min="1" max="512" value="128" required></label>
       <label>Oversampling (p)<input id="rq-p" type="number" min="4" max="64" value="10" required></label>
       <label>Residual probes (N)<input id="rq-count" type="number" min="1" max="1024" value="32" required></label>
-      <label>Omitted bias ratio (η)<input id="rq-eta" type="number" min="0" step="any" value="0.1" placeholder="Not supplied"></label>
-    </div></details>
-    <details><summary>Randomization, covariance backend and probability targets</summary><div class="settings">
+    </div></section>
+    <section class="rq-settings-box"><h4>Randomization, covariance backend and probability targets</h4><div class="settings">
       <label>Gaussian sketch seed<input id="rq-sketch" type="number" min="0" max="4294967295" value="0" required></label>
       <label>Rademacher probe seed<input id="rq-probe" type="number" min="0" max="4294967295" value="0" required></label>
       <label>Block size<input id="rq-block" type="number" min="1" max="64" value="8" required></label>
       <label>Relative tolerance (ε)<input id="rq-epsilon" type="number" min="0" max="1" step="any" value="0.2" required></label>
       <label>Failure target (δ)<input id="rq-delta" type="number" min="0" max="1" step="any" value="0.01" required></label>
-    </div></details>
-    <div class="settings"><label>Number of trials<input id="rq-trials" type="number" min="1" max="10000" value="100" required></label></div>
-    <button id="rq-submit" class="primary" type="submit">Run reconstruction</button>
+    </div></section>
+    <button id="rq-submit" class="primary" type="submit">Prepare reconstruction &amp; select K</button>
   </form>
+  <p id="rq-preparation-status" role="status">Prepare a reconstruction first. No plots or validation trials run in this stage.</p>
+  <h3>2. Confidence intervals and validation</h3>
+  <form id="rq-final-form"><div class="settings">
+    <label>η calibrated from drawing<input id="rq-eta" type="number" readonly placeholder="Awaiting K"></label>
+    <label>Tail probability (α)<input id="rq-alpha" type="number" min="0" max="1" step="any" value="0.05" required></label>
+    <label>Number of trials<input id="rq-trials" type="number" min="1" max="10000" value="100" required></label>
+  </div><button id="rq-finalize" class="primary" type="submit" disabled>Calculate intervals &amp; run validation</button></form>
   <p id="rq-error" role="alert"></p><p id="rq-status" role="status">No randomized analysis selected.</p>
   <div class="settings"><label>Saved reconstruction<select id="rq-analyses"><option value="">Select a result</option></select></label><button id="rq-refresh">Refresh records</button></div>
 </section>

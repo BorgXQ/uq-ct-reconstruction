@@ -4,10 +4,11 @@ import {rowPlot} from './validation-presentation.js';
 import {api,get,watch} from './ct.js';
 import {mapBytes} from './exact-view.js';
 const $=id=>document.getElementById(id),num=id=>Number($(id).value),uid=()=>crypto.randomUUID();
-let rankResolution=null;
+let rankResolution=null,prepared=null,preparedSignature=null,preparing=false,finalizing=false;
+const preparationSignature=()=>JSON.stringify([...$('rq-form').querySelectorAll('input,select')].map(e=>[e.id,e.value]));
 let observations=[],truth=null,pendingObservation=null,base=null,view=null,generation=0,serial=0,signature=null;
 const guarded=fn=>async(...args)=>{try{await fn(...args);}catch(e){$('rq-error').textContent=e.message;}};
-const formSignature=()=>JSON.stringify([...$('rq-form').querySelectorAll('input,select')].map(e=>[e.id,e.type==='checkbox'?e.checked:e.value]));
+const formSignature=()=>JSON.stringify([...document.querySelectorAll('#rq-form input,#rq-form select,#rq-final-form input')].map(e=>[e.id,e.type==='checkbox'?e.checked:e.value]));
 function options(id,rows,key,label){const el=$(id),old=el.value;el.replaceChildren(new Option('Select a record',''));for(const r of rows)el.add(new Option(label(r),r[key]));if(rows.some(r=>r[key]===old))el.value=old;}
 function controls(){
   const automatic=$('rq-mode').value==='automatic';
@@ -17,40 +18,64 @@ function controls(){
   const o=observations.find(o=>o.observation_id===$('rq-observation').value);
   if(o&&o.resolution!==rankResolution){$('rq-rank').value=({16:32,32:64,64:128})[o.resolution]??Math.min(128,o.resolution*2);rankResolution=o.resolution;}
   $('rq-context').textContent=o?`${o.resolution} × ${o.resolution}; observation ${o.observation_id.slice(0,8)}; noise SD ${o.noise.sigma}.`:'Select an observation from Measure.';
-  $('rq-submit').disabled=!o||!sourceReady();$('rq-submit').textContent='Run reconstruction';
+  $('rq-submit').disabled=!o||!sourceReady()||preparing;
+  $('rq-finalize').disabled=finalizing||preparing||!prepared||preparedSignature!==preparationSignature()||prepared.eta_calibration?.eta==null;
+  if(prepared&&preparedSignature!==preparationSignature()){
+    prepared=null;preparedSignature=null;$('rq-eta').value='';delete $('rq-eta').dataset.help;
+    $('rq-preparation-status').textContent='Stage 1 settings changed. Prepare again to select a matching K and η.';
+  }
   observationChanged(controls);
   if(base)$('rq-mismatch').textContent=signature===formSignature()?'Displayed result matches submitted controls.':'Displayed result keeps its captured settings. Recalculate to apply current controls.';
 }
 async function lists(){
   const r=await get('/api/randomized-analyses');
-  options('rq-analyses',r.randomized_analyses,'analysis_id',a=>`${a.analysis_id.slice(0,8)} · ${a.status} · K ${a.selected_k??'none'} · r ${a.configuration.rank}`);controls();
+  options('rq-analyses',r.randomized_analyses.filter(a=>a.workflow_phase!=='prepared'),'analysis_id',a=>`${a.analysis_id.slice(0,8)} · ${a.status} · K ${a.selected_k??'none'} · r ${a.configuration.rank}`);controls();
 }
 window.addEventListener('ct-records',e=>{observations=e.detail.observations;options('rq-observation',observations,'observation_id',o=>`${o.observation_id.slice(0,8)} · ${o.resolution}² · σ ${o.noise.sigma}`);if(pendingObservation&&observations.some(o=>o.observation_id===pendingObservation))$('rq-observation').value=pendingObservation;lists().catch(e=>$('rq-error').textContent=e.message);});
 window.addEventListener('ct-observation-selected',e=>{pendingObservation=e.detail;if($('rq-observation').value!==e.detail){$('rq-observation').value=e.detail;generation++;}controls();});
 $('rq-observation').onchange=()=>{pendingObservation=$('rq-observation').value;};
+$('rq-final-form').addEventListener('input',controls);
 $('rq-form').addEventListener('input',()=>{generation++;controls();});$('rq-form').addEventListener('change',()=>{generation++;controls();});
 function request(){
   const body={request_id:uid(),rank:num('rq-rank'),oversampling:num('rq-p'),sketch_seed:num('rq-sketch'),probe_seed:num('rq-probe'),probe_count:num('rq-count'),block_size:num('rq-block'),epsilon:num('rq-epsilon'),delta:num('rq-delta'),backend:'matrix_free',reference:true,
-    eta:$('rq-eta').value.trim()===''?null:{value:num('rq-eta'),provenance:'User-specified omitted-bias assumption; not verified.'}};
-  return ['/api/randomized-analyses',{...body,observation_id:$('rq-observation').value,step_policy:'power_iteration_half_v1',alpha:num('rq-alpha'),settings_origin:'unverified',declaration:'User-specified settings; noise independence has not been established.',
+    eta:null};
+  return ['/api/randomized-preparations',{...body,observation_id:$('rq-observation').value,step_policy:'power_iteration_half_v1',alpha:0.05,settings_origin:'unverified',declaration:'User-specified settings; noise independence has not been established.',
     source:calibratedSource(),
     selection:$('rq-mode').value==='automatic'?{mode:'automatic',budget:num('rq-budget')}:{mode:'fixed',iterations:num('rq-k'),provenance:'imported_selection_unknown'}}];
 }
 $('rq-form').onsubmit=guarded(async e=>{
-  e.preventDefault();const [url,body]=request(),g=++generation,s=serial,sig=formSignature(),trials=num('rq-trials');$('rq-error').textContent='';
-  const {result:job}=await api(url,body);$('rq-status').textContent=`Captured job ${job.job_id}; use the shared job panel to cancel.`;
-  const done=await watch(job);await lists();
-  if(done.result?.analysis_id){
-    const a=await get('/api/randomized-analyses/'+done.result.analysis_id);
-    if(g===generation&&s===serial)await show(a.analysis_id,sig);
-    await runCoverage(a,trials);
-  }
-  else if(done.status==='failed')throw Error(done.error?.message||'Analysis failed. Previous records are preserved.');
+  e.preventDefault();const [url,body]=request(),g=++generation,sig=preparationSignature();
+  prepared=null;preparedSignature=null;preparing=true;$('rq-eta').value='';delete $('rq-eta').dataset.help;
+  $('rq-error').textContent='';$('rq-results').hidden=true;clearCoverage();controls();
+  $('rq-preparation-status').textContent='Selecting K and calibrating η…';
+  try{
+    const {result:job}=await api(url,body);const done=await watch(job);await lists();
+    if(g!==generation)return;
+    if(done.status!=='completed')throw Error(done.error?.message||`Preparation ${done.status}.`);
+    const a=await get('/api/randomized-analyses/'+done.result.analysis_id);if(g!==generation)return;
+    if(a.status!=='completed'){$('rq-preparation-status').textContent='No stopping crossing within the budget. No K or η was substituted.';return;}
+    prepared=a;preparedSignature=sig;const c=a.eta_calibration;
+    $('rq-eta').value=c?.eta??'';
+    $('rq-eta').dataset.help=`At K = ${a.iteration}: retained-bias norm ${c.actual_retained_bias_norm.toPrecision(6)}; omitted-bias norm ${c.actual_omitted_bias_norm.toPrecision(6)}. η = omitted / retained. Retained bound ${c.retained_bound?.toPrecision(6)??'unavailable'}: ${c.retained_assumption_supported?'passes':'fails or unresolved'}. Drawing-calibrated; not a theoretical guarantee.`;
+    $('rq-preparation-status').textContent=`K = ${a.iteration}; η = ${c.eta==null?'unavailable ('+c.ratio_status+')':c.eta.toPrecision(6)}. Retained-bias bound ${c.retained_assumption_supported?'passes this drawing check.':'fails or is unresolved; calibrated η does not repair it. Intervals remain exploratory.'}`;
+  }finally{preparing=false;if(g!==generation)$('rq-preparation-status').textContent='Settings changed during preparation. Prepare again for current settings.';else if(!prepared&&$('rq-preparation-status').textContent.startsWith('Selecting'))$('rq-preparation-status').textContent='Preparation did not complete. See the error or job status, then retry.';controls();}
+});
+$('rq-final-form').onsubmit=guarded(async e=>{
+  e.preventDefault();if(!prepared||preparedSignature!==preparationSignature()||prepared.eta_calibration?.eta==null)throw Error('Complete stage 1 with current settings first.');
+  const captured=prepared,g=generation,alpha=num('rq-alpha'),trials=num('rq-trials'),sig=formSignature();finalizing=true;controls();$('rq-error').textContent='';
+  try{
+    const {result:job}=await api(`/api/randomized-analyses/${captured.analysis_id}/finalize`,{request_id:uid(),alpha});
+    const done=await watch(job);if(done.status!=='completed')throw Error(done.error?.message||`Intervals ${done.status}.`);
+    const a=await get('/api/randomized-analyses/'+done.result.analysis_id);await lists();
+    if(g!==generation||prepared!==captured)return;
+    await show(a.analysis_id,sig);await runCoverage(a,trials);
+  }finally{finalizing=false;controls();}
 });
 async function show(aid,sig=null){
   const token=++serial;truth=null;base=view=null;$('rq-results').hidden=true;clearCoverage();
   if(!aid)return;
   const a=await get('/api/randomized-analyses/'+aid);
+  if(a.workflow_phase==='prepared')return;
   const snapshot=await get('/api/snapshots/'+a.snapshot_id);if(token!==serial)return;
   truth=snapshot.pixels;base=view=a;signature=sig;$('rq-analyses').value=aid;$('rq-results').hidden=false;
   $('rq-main-row').value=Math.floor(a.shape[0]/2);$('rq-main-row').max=a.shape[0]-1;

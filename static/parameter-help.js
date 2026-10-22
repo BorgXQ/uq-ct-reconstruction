@@ -25,7 +25,7 @@ const help={
   'rq-rank':'Number r of retained normal-operator directions for uncertainty approximation. Defaults: 32 at 16², 64 at 32², 128 at 64². Landweber still uses the full operator.',
   'rq-p':'Additional random sketch directions beyond r. The sketch width is r + p; more oversampling can improve the approximation but costs work.',
   'rq-count':'Number N of Rademacher probes used to estimate the omitted covariance diagonal. More probes can reduce estimation noise; these are not repeated measurement trials.',
-  'rq-eta':'Assumed upper bound on omitted bias relative to retained bias. Total bias allowance is (1 + η) times the retained approximation. Leave blank for no total-error interval; 0 assumes no omitted bias. This assumption is not automatically verified.',
+  'rq-eta':'Calculated after K is selected: actual omitted-bias norm / actual retained-bias norm. Uses the frozen drawing; the retained-bias bound must still be checked.',
   'rq-sketch':'Seed for the Gaussian sketch used in randomized SVD. It changes the approximation, not the observed sinogram.',
   'rq-probe':'Seed for the ±1 Rademacher residual probes. It changes the covariance estimate, not measurement noise.',
   'rq-block':'Number of probe or sketch columns processed together. Controls working memory and execution efficiency, not the requested number of samples.',
@@ -86,9 +86,10 @@ function attach(control,text){
   const button=document.createElement('button');button.type='button';button.className='parameter-help';button.textContent='?';
   button.setAttribute('aria-label','About '+(control.getAttribute('aria-label')||label.childNodes[0]?.textContent?.trim()||label.textContent.trim()||control.id));
   button.dataset.parameter=control.id||control.value;
-  button.onmouseenter=()=>show(button,text);button.onmouseleave=()=>{if(document.activeElement!==button)hide();};
-  button.onfocus=()=>show(button,text);button.onblur=hide;
-  button.onclick=e=>{e.preventDefault();e.stopPropagation();show(button,text);};
+  const description=()=>control.dataset.help||text;
+  button.onmouseenter=()=>show(button,description());button.onmouseleave=()=>{if(document.activeElement!==button)hide();};
+  button.onfocus=()=>show(button,description());button.onblur=hide;
+  button.onclick=e=>{e.preventDefault();e.stopPropagation();show(button,description());};
   label.insertBefore(button,control);
 }
 for(const [id,text]of Object.entries(help)){const control=document.getElementById(id);if(control)attach(control,text);}

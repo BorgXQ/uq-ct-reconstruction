@@ -40,7 +40,9 @@
 .rq-primary-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 24px;align-items:start}
 #rq-main-image {display:block;width:100%;aspect-ratio:1;image-rendering:pixelated;cursor:crosshair}
 #rq-primary svg {max-height:none}
-#rq-form > details {margin:16px 0}
+.rq-settings-box {margin:16px 0;padding:18px;border:1px solid #c9d3ca;border-radius:12px;background:rgba(255,255,255,.35)}
+.rq-settings-box > h4 {margin:0 0 14px;font-size:14px}
+.rq-settings-box > .settings {margin-bottom:0}
 #rq-primary-status {color:var(--muted);font-size:13px}
 #rq-results {margin-bottom:20px}
 @media(max-width:900px){.rq-primary-grid {grid-template-columns:1fr}#rq-main-image{max-width:420px}}

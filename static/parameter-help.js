@@ -25,7 +25,7 @@ const help={
   'rq-sketch':'Seed for the Gaussian sketch used in randomized SVD. It changes the approximation, not the observed sinogram.',
   'rq-probe':'Seed for the ±1 Rademacher residual probes. It changes the covariance estimate, not measurement noise.',
   'rq-block':'Number of probe or sketch columns processed together. Controls working memory and execution efficiency, not the requested number of samples.',
-  'rq-epsilon':'Relative residual-estimation tolerance ε. The correction uses |estimated residual| / (1 − ε). Larger ε increases that allowance; the tolerance is not automatically certified.',
+  'rq-epsilon':'Relative residual-estimation tolerance ε. The correction uses |estimated residual| / (1 − ε). Zero omits residual inflation, following the paper’s numerical approximation; it does not mean zero estimation error. Larger ε increases the allowance.',
   'rq-delta':'Requested failure probability δ for residual-estimation control. Smaller δ generally requires more probes. Entering δ alone does not establish the probability guarantee.',
   'rq-analyses':'Reload a saved reconstruction and its captured settings. Editing the form does not change saved results.',
   'rq-main-row':'Zero-based horizontal image row shown in the confidence-interval plot; the blue line marks it on the image.',

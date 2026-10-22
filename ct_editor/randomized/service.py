@@ -71,9 +71,8 @@ class RandomizedService:
         for key,low,high in [('rank',1,min(512,n)),('oversampling',4,64),('sketch_seed',0,2**32-1),('probe_seed',0,2**32-1),('probe_count',1,1024),('block_size',1,64)]:
             integer(config[key],key,low,high)
         if config['rank']+config['oversampling']>n:raise InputError('Require rank + oversampling ≤ image dimension.')
-        for key in ('epsilon','delta'):
-            scalar(config[key],key,0,1)
-            if not 0<config[key]<1:raise InputError(f'{key} must lie strictly between zero and one.')
+        if not 0<=scalar(config['epsilon'],'epsilon')<1:raise InputError('epsilon must satisfy 0 ≤ epsilon < 1.')
+        if not 0<scalar(config['delta'],'delta')<1:raise InputError('delta must lie strictly between zero and one.')
         if config['eta'] is not None:
             fields(config['eta'],('value','provenance'),('value','provenance'))
             scalar(config['eta']['value'],'eta');identifier(config['eta']['provenance'],'eta provenance')

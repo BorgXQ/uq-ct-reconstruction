@@ -62,8 +62,8 @@ def validate_plan(p,c,n):
         fields(c['eta'],('value','provenance'),('value','provenance'));scalar(c['eta']['value'],'eta');identifier(c['eta']['provenance'],'eta provenance')
     for key,lo,hi in [('rank',1,min(n,512)),('oversampling',4,64),('probe_count',1,1024),('block_size',1,64),('sketch_seed',0,2**32-1),('probe_seed',0,2**32-1)]:integer(c[key],key,lo,hi)
     if c['rank']+c['oversampling']>n:raise InputError('Rank + oversampling must fit the numerical image.')
-    for key in ('epsilon','delta'):
-        if not 0<scalar(c[key],key)<1:raise InputError(f'{key} must be between zero and one.')
+    if not 0<=scalar(c['epsilon'],'epsilon')<1:raise InputError('epsilon must satisfy 0 ≤ epsilon < 1.')
+    if not 0<scalar(c['delta'],'delta')<1:raise InputError('delta must lie strictly between zero and one.')
     if type(c['reference']) is not bool:raise InputError('Reference must be Boolean.')
 
 
@@ -84,7 +84,7 @@ class ValidationService:
         if record['status']!='completed':raise InputError('Choose a completed analysis template.')
         c=deepcopy(record['configuration']);o=self.ct._get('observations',c['observation_id']).meta()
         acquisition=self.ct._get('acquisitions',o['acquisition_id']).meta();spec=self.ct.specs[o['operator_id']]
-        defaults=dict(rank=2,oversampling=4,probe_count=32,block_size=8,sketch_seed=0,probe_seed=0,epsilon=.2,delta=.01,eta=None,backend='matrix_free',reference=False)
+        defaults=dict(rank=2,oversampling=4,probe_count=32,block_size=8,sketch_seed=0,probe_seed=0,epsilon=0.,delta=.01,eta=None,backend='matrix_free',reference=False)
         for key,value in defaults.items():c.setdefault(key,value)
         if 'reference' in data:c['reference']=data['reference']
         p=dict(protocol='fixed_algorithm',comparison='common_k',purpose='exploratory_study',scope='intervals',trials=100,root_seed=2026,

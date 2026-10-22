@@ -14,7 +14,7 @@ import zipfile
 from time import perf_counter
 import numpy as np
 from scipy.sparse import csr_matrix
-from ..images import InputError
+from ..images import InputError, RESOLUTIONS
 from ..ct.geometry import Geometry,Operator,integer
 from ..ct.jobs import now
 from ..randomized.numerics import factor_record
@@ -129,7 +129,7 @@ def read_bundle(raw,limit):
 def validate_result(r):
     """Validate relationships, not imported assertions of theoretical validity."""
     p=r['plan'];c=r['configuration'];g=p['geometry'];n=g['resolution']**2
-    if g['resolution'] not in (16,32,64):raise ValueError('Unsupported image grid')
+    if g['resolution'] not in RESOLUTIONS:raise ValueError('Unsupported image grid')
     spec=Geometry.arrays(g['resolution'],g['angles'],g['offsets'],g['range_degrees'])
     if spec.geometry_hash!=g['geometry_hash']:raise ValueError('Geometry version/hash mismatch')
     if p.get('schema')!='validation_plan_v1' or p['seed_version']!=SEED_VERSION:raise ValueError('Unsupported plan/seed version')

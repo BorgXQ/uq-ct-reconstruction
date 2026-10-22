@@ -47,7 +47,7 @@ class NumericalTests(unittest.TestCase):
 
     def test_area_and_hashes(self):
         source = np.arange(512*512, dtype=np.uint8).reshape(512,512)
-        for n in (16,32,64):
+        for n in (16,32,64,128):
             m,p = convert(source.tobytes(),n)
             actual = np.frombuffer(p, dtype='<f8').reshape(n,n)
             self.assertAlmostEqual(actual.mean(), source.astype(float).mean()/255, delta=1e-12)
@@ -104,7 +104,7 @@ class StoreTests(unittest.TestCase):
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
-        self.app=create_app({'TESTING':True,'SNAPSHOT_LIMIT':3});self.client=self.app.test_client()
+        self.app=create_app({'TESTING':True,'SNAPSHOT_LIMIT':4});self.client=self.app.test_client()
 
     def test_shell(self):
         self.assertEqual(self.client.get('/').status_code,200)
@@ -115,7 +115,7 @@ class ApiTests(unittest.TestCase):
     def test_freeze_list_retrieve_and_resolution(self):
         source=np.zeros((512,512),np.uint8);source[0,0]=255
         ids=[]
-        for n in (16,32,64):
+        for n in (16,32,64,128):
             body=request_for(source,n)
             preview=self.client.post('/api/images/preview',json=body)
             self.assertEqual(preview.status_code,200)
@@ -133,7 +133,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/snapshots/'+ids[0]).json['shape'],[16,16])
         self.assertTrue(all('pixels' not in x for x in self.client.get('/api/snapshots').json['snapshots']))
         self.assertEqual(self.client.post('/api/snapshots',json=request_for()).status_code,507)
-        self.assertEqual(len(self.client.get('/api/snapshots').json['snapshots']),3)
+        self.assertEqual(len(self.client.get('/api/snapshots').json['snapshots']),4)
 
     def test_zero_and_duplicate(self):
         a=self.client.post('/api/snapshots',json=request_for()).json
@@ -143,7 +143,7 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(all(x==0 for x in a['pixels']))
 
     def test_validation(self):
-        bad=[('numerical_resolution',True),('numerical_resolution',32.0),('numerical_resolution',128),('source_side',True),('source_side',511),('editor_revision',-1),('editor_revision',False),('editor_revision',1.5),('request_id',''),('request_id','x'*129),('editor_document_id',None),('source_encoding','RGBA'),('preprocessing_version','other'),('source_data','!'),('source_data','!'*349528),('source_data',base64.b64encode(bytes(512**2+1)).decode())]
+        bad=[('numerical_resolution',True),('numerical_resolution',32.0),('numerical_resolution',256),('source_side',True),('source_side',511),('editor_revision',-1),('editor_revision',False),('editor_revision',1.5),('request_id',''),('request_id','x'*129),('editor_document_id',None),('source_encoding','RGBA'),('preprocessing_version','other'),('source_data','!'),('source_data','!'*349528),('source_data',base64.b64encode(bytes(512**2+1)).decode())]
         for field,value in bad:
             with self.subTest(field=field,value=str(value)[:20]):
                 body=request_for();body[field]=value

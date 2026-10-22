@@ -9,7 +9,7 @@ import numpy as np
 
 VERSION = "block_area_v1"
 SOURCE_SIDE = 512
-RESOLUTIONS = (16, 32, 64)
+RESOLUTIONS = (16, 32, 64, 128)
 
 
 class InputError(ValueError):

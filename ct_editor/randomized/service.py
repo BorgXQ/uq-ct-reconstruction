@@ -68,7 +68,7 @@ class RandomizedService:
         identifier(config['declaration'],'declaration')
         om=self.ct._get('observations',identifier(config['observation_id'],'observation_id')).meta();spec=self.ct.specs[om['operator_id']]
         n=spec.shape[1]
-        for key,low,high in [('rank',1,min(512,n)),('oversampling',4,64),('sketch_seed',0,2**32-1),('probe_seed',0,2**32-1),('probe_count',1,1024),('block_size',1,64)]:
+        for key,low,high in [('rank',1,n),('oversampling',4,64),('sketch_seed',0,2**32-1),('probe_seed',0,2**32-1),('probe_count',1,1024),('block_size',1,64)]:
             integer(config[key],key,low,high)
         if config['rank']+config['oversampling']>n:raise InputError('Require rank + oversampling ≤ image dimension.')
         if not 0<=scalar(config['epsilon'],'epsilon')<1:raise InputError('epsilon must satisfy 0 ≤ epsilon < 1.')

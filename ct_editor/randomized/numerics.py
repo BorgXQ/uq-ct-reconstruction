@@ -66,7 +66,7 @@ class NormalAction:
 
 
 def gaussian_factors(op,r,p,seed,block=8,check=lambda:None,progress=lambda *a:None, *, seed_entropy=None):
-    n=op.shape[1];integer(r,'rank',1,min(n,512));integer(p,'oversampling',4,64)
+    n=op.shape[1];integer(r,'rank',1,n);integer(p,'oversampling',4,64)
     if r+p>n: raise InputError('Require rank + oversampling ≤ image dimension.','rank')
     integer(seed,'sketch_seed',0,2**32-1);integer(block,'block_size',1,64)
     if seed_entropy is not None:

@@ -60,7 +60,7 @@ def validate_plan(p,c,n):
         raise InputError('Coverage requires source and corrected-method eta declarations. Choose moments only or complete the template.')
     if c.get('eta') is not None:
         fields(c['eta'],('value','provenance'),('value','provenance'));scalar(c['eta']['value'],'eta');identifier(c['eta']['provenance'],'eta provenance')
-    for key,lo,hi in [('rank',1,min(n,512)),('oversampling',4,64),('probe_count',1,1024),('block_size',1,64),('sketch_seed',0,2**32-1),('probe_seed',0,2**32-1)]:integer(c[key],key,lo,hi)
+    for key,lo,hi in [('rank',1,n),('oversampling',4,64),('probe_count',1,1024),('block_size',1,64),('sketch_seed',0,2**32-1),('probe_seed',0,2**32-1)]:integer(c[key],key,lo,hi)
     if c['rank']+c['oversampling']>n:raise InputError('Rank + oversampling must fit the numerical image.')
     if not 0<=scalar(c['epsilon'],'epsilon')<1:raise InputError('epsilon must satisfy 0 ≤ epsilon < 1.')
     if not 0<scalar(c['delta'],'delta')<1:raise InputError('delta must lie strictly between zero and one.')

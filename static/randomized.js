@@ -16,7 +16,8 @@ function controls(){
   $('rq-k').disabled=automatic;$('rq-k').required=!automatic;
   $('rq-budget').disabled=!automatic;$('rq-budget').required=automatic;
   const o=observations.find(o=>o.observation_id===$('rq-observation').value);
-  if(o&&o.resolution!==rankResolution){$('rq-rank').value=({16:32,32:64,64:128})[o.resolution]??Math.min(128,o.resolution*2);rankResolution=o.resolution;}
+  if(o&&o.resolution!==rankResolution){$('rq-rank').value=({16:32,32:64,64:128,128:256})[o.resolution]??Math.min(128,o.resolution*2);rankResolution=o.resolution;}
+  if(o)$('rq-rank').max=o.resolution**2-Number($('rq-p').value);
   $('rq-context').textContent=o?`${o.resolution} × ${o.resolution}; observation ${o.observation_id.slice(0,8)}; noise SD ${o.noise.sigma}.`:'Select an observation from Measure.';
   $('rq-submit').disabled=!o||!sourceReady()||preparing;
   $('rq-finalize').disabled=finalizing||preparing||!prepared||preparedSignature!==preparationSignature()||prepared.eta_calibration?.eta==null;

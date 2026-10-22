@@ -24,7 +24,8 @@ def create_app(config=None):
     app.config.update(MAX_CONTENT_LENGTH=1024**2, SNAPSHOT_LIMIT=50, SNAPSHOT_BYTE_LIMIT=64 * 1024**2)
     if config:
         app.config.update(config)
-    budget = MemoryBudget(app.config.get('CT_MEMORY_BYTES', 512 * 1024**2))
+    # Full source calibration at 128² reserves three dense 16384² arrays.
+    budget = MemoryBudget(app.config.get('CT_MEMORY_BYTES', 8 * 1024**3))
     store = SnapshotStore(app.config["SNAPSHOT_LIMIT"], app.config["SNAPSHOT_BYTE_LIMIT"], budget)
     app.extensions["snapshot_store"] = store
     service = CTService(store, budget, app.config)

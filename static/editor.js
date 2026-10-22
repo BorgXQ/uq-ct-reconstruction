@@ -1,3 +1,4 @@
+import {modifiedSheppLogan} from './phantom.js';
 import {RasterHistory, floodFill} from './editor-core.js';
 
 export function paintRaster(canvas, pixels, side) {
@@ -83,7 +84,7 @@ export class Editor {
   }
   action(name) {
     if (this.gesture) return;
-    const changed = name === 'clear' ? this.history.commit(new Uint8Array(512*512)) : this.history[name]();
+    const changed = name === 'phantom' ? this.history.commit(modifiedSheppLogan()) : name === 'clear' ? this.history.commit(new Uint8Array(512*512)) : this.history[name]();
     if (changed) { this.render(); this.onChange(); }
   }
 }

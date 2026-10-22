@@ -42,3 +42,14 @@ test('byte serialization preserves the entire raster', () => {
   const bytes=Uint8Array.from({length:512*512},(_,i)=>i%256);
   assert.deepEqual(new Uint8Array(Buffer.from(base64(bytes),'base64')),bytes);
 });
+
+test('modified phantom has expected contrast, orientation and reversible loading', async () => {
+  const {modifiedSheppLogan}=await import('../static/phantom.js');
+  const p=modifiedSheppLogan(101),pixel=(x,y)=>p[Math.round((1-y)*50)*101+Math.round((x+1)*50)];
+  assert.equal(pixel(0,0),51);assert.equal(pixel(0,.9),255);
+  assert.equal(pixel(-.22,0),0);assert.equal(pixel(.9,.9),0);
+  assert.ok(Math.abs(pixel(0,.35)-76.5)<=.5);
+  const history=new RasterHistory(101);history.commit(p);history.undo();
+  assert.ok(history.pixels.every(v=>v===0));history.redo();assert.deepEqual(history.pixels,p);
+  assert.equal(modifiedSheppLogan().length,512*512);
+});

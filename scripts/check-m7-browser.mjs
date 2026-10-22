@@ -14,7 +14,16 @@ try{
  await page.selectOption('#resolution','16');await page.click('[data-tool=circle]');const b=await page.locator('#editor').boundingBox();await page.mouse.move(b.x+b.width*.5,b.y+b.height*.5);await page.mouse.down();await page.mouse.move(b.x+b.width*.7,b.y+b.height*.5);await page.mouse.up();
  await page.click('#freeze');await page.waitForFunction(()=>document.querySelector('#freeze-status').textContent.startsWith('Frozen snapshot')&&!document.querySelector('#freeze').disabled);
  await page.click('#nav-measure');await page.fill('#n-angles','24');await page.fill('#n-detectors','24');await page.fill('#sigma','0.02');const scan=await action('#generate-scan','/api/acquisitions');await page.waitForFunction(()=>!document.querySelector('#scan-results').hidden);
- const jobsBefore=(await get('/api/jobs')).jobs.length;await page.click('#nav-uq');assert.equal(await page.inputValue('#rq-observation'),scan.observation_id);assert.equal((await get('/api/jobs')).jobs.length,jobsBefore);
+ await page.click('#nav-uq');assert.equal(await page.inputValue('#rq-observation'),scan.observation_id);
+ await page.waitForFunction(()=>document.querySelector('#rq-source-status').textContent.startsWith('Compatible'),{},{timeout:120000});
+ assert.equal(await page.locator('#rq-M').getAttribute('readonly'),'');
+ const initialM=Number(await page.inputValue('#rq-M'));assert.ok(initialM>0);
+ await page.locator('#rq-source-options > summary').click();await page.fill('#rq-nu','0.6');
+ assert.equal(await page.locator('#rq-submit').isDisabled(),true);assert.equal(await page.inputValue('#rq-M'),'');
+ await page.locator('#rq-nu').press('Tab');await page.waitForFunction(()=>document.querySelector('#rq-source-status').textContent.startsWith('Compatible'));
+ assert.notEqual(Number(await page.inputValue('#rq-M')),initialM);
+ await page.fill('#rq-nu','0.5');await page.locator('#rq-nu').press('Tab');await page.waitForFunction(()=>document.querySelector('#rq-source-status').textContent.startsWith('Compatible'));
+ assert.equal(Number(await page.inputValue('#rq-M')),initialM);await page.locator('#rq-source-options > summary').click();
  assert.equal(await page.locator('#optional-validation,#vl-form,#rq-map-grid,#rq-inspect').count(),0);
  assert.equal(await page.inputValue('#rq-trials'),'100');
  assert.equal(await page.inputValue('#rq-mode'),'automatic');assert.equal(await page.inputValue('#rq-budget'),'1500');

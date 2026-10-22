@@ -19,6 +19,8 @@ from .diagnostics import diagnose,source_check
 class ExactService:
     def __init__(self, ct, config):
         self.ct=ct
+        from .calibration import SourceCalibration
+        self.source_calibration=SourceCalibration(ct)
         for table,limit in [('exact_analyses',32),('exact_views',64),('exact_diagnostics',32)]:
             ct.records[table]={};ct.pending[table]=0;ct.limits[table]=config.get(table.upper()+'_LIMIT',limit)
         self.cache=OrderedDict();self.cache_bytes=0

@@ -10,6 +10,8 @@ def routes(service):
         data=request.get_json()
         if not isinstance(data,dict): raise InputError('Expected an object.')
         return data
+    @bp.post('/api/source-calibrations')
+    def calibrate(): return jsonify(service.source_calibration.submit(body())),202
     @bp.post('/api/exact-analyses')
     def create(): return jsonify(service.submit(body())),202
     @bp.post('/api/reconstructions/<rid>/exact-analyses')

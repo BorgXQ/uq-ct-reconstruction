@@ -56,7 +56,7 @@ class ValidationTests(unittest.TestCase):
         self.oid=scan['observation_id']
         req=dict(request_id='random',observation_id=self.oid,source=dict(nu=.5,M=2.,provenance='test declaration'),alpha=.05,
             settings_origin='declared_independent',declaration='Synthetic test',step_policy='safe_induced_norm_v1',selection=dict(mode='fixed',iterations=4,provenance='fixed_predeclared'),
-            rank=2,oversampling=4,sketch_seed=17,probe_seed=23,probe_count=4,block_size=2,epsilon=.2,delta=.01,eta=dict(value=.1,provenance='test'),backend='matrix_free',reference=False)
+            rank=2,oversampling=4,sketch_seed=17,probe_seed=23,probe_count=4,block_size=2,epsilon=0.,delta=.01,eta=dict(value=.1,provenance='test'),backend='matrix_free',reference=False)
         self.template=self.job('/api/randomized-analyses',req)['analysis_id']
     def tearDown(self):self.ct.runner.close();self.tmp.cleanup()
     def job(self,path,data):

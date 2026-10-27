@@ -8,7 +8,13 @@
 <div class="workspace draw-grid">
 <section class="panel"><div class="panel-title"><div><span class="eyebrow">01A</span><h2>Create source image</h2></div><span class="tag">512 × 512</span></div>
 <div class="draw-card-controls"><fieldset id="paint-controls"><legend>Drawing tools</legend>
-<button id="load-phantom" type="button">Load modified Shepp–Logan phantom</button>
+<div class="example-loader"><select id="example-image" aria-label="Example image">
+<option value="modified-shepp-logan" selected>Modified Shepp–Logan</option>
+<option value="original-shepp-logan">Original Shepp–Logan</option>
+<option value="smooth-gradient">Smooth gradient</option>
+<option value="concentric-disks">Concentric disks</option>
+<option value="asymmetric-disks">Asymmetric disks</option>
+</select><button id="load-phantom" type="button">Load</button></div>
 <div class="tools" role="group" aria-label="Drawing tool"><button data-tool="brush" aria-pressed="true">Brush</button><button data-tool="eraser" aria-pressed="false">Eraser</button><button data-tool="circle" aria-pressed="false">Circle</button></div>
 <div class="draw-palette-row"><div class="palette" aria-label="Quick grayscale palette"><button data-shade="0" style="--shade:0">0</button><button data-shade="64" style="--shade:64">64</button><button data-shade="128" style="--shade:128">128</button><button data-shade="192" style="--shade:192">192</button><button data-shade="255" style="--shade:255">255</button></div>
 <output id="shade-value" aria-live="polite">255 / 255 = 1</output></div>

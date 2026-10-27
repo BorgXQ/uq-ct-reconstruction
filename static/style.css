@@ -164,3 +164,7 @@ main{padding-bottom:64px}
 @media(max-width:600px){#rq-form .settings:not(.snapshot-controls),#rq-form .rq-settings-box:last-of-type .settings,#rq-final-form .settings{grid-template-columns:1fr}}
 
 #randomized-panel,#randomized-validation-panel{margin-bottom:20px}
+
+.example-loader{display:flex;align-items:center;gap:10px;min-width:0;align-self:center}
+.example-loader select{flex:1;min-width:0;width:100%}
+.example-loader button{flex:none}

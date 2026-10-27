@@ -151,4 +151,4 @@ $('refresh-snapshots').onclick = async () => {
 $('retry').onclick = preview; $('grid').onchange = overlay;
 setShade(255); controls(); preview(); refreshSnapshots().catch(error => report(`Snapshot list unavailable: ${error.message}`));
 
-$('load-phantom').onclick=()=>{mode='draft';editor.action('phantom');render();};
+$('load-phantom').onclick=()=>{mode='draft';editor.action('phantom',$('example-image').value);render();};

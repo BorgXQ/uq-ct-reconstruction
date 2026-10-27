@@ -1,18 +1,17 @@
 <section id="measure-workspace" hidden>
-<div class="panel"><div class="panel-title"><div><span class="eyebrow">02 / MEASURE</span><h2>Turn an object into line measurements</h2></div><span id="measure-state" class="tag">not_ready</span></div>
+<div class="panel"><div class="panel-title"><div><span class="eyebrow">02 / APPLY RADON TRANSFORM</span><h2>Obtain observed sinogram</h2></div></div>
 <form id="acquisition-form">
-<div class="settings"><label class="grow">Frozen numerical image<select id="measure-snapshot" required><option value="">Select a snapshot</option></select></label><button type="button" id="ct-refresh">Refresh records</button></div>
+<div class="settings snapshot-controls"><label class="grow">Frozen numerical image<select id="measure-snapshot" required><option value="">Select a snapshot</option></select></label><button type="button" id="ct-refresh">Refresh records</button></div>
 <p id="source-context" class="hint">Freeze an image in Draw before generating a scan.</p>
-<div class="settings"><label>Projection angles<input id="n-angles" type="number" min="1" max="360" step="1" value="180" required></label><label>Detector count<input id="n-detectors" type="number" min="2" max="256" step="1" value="95" required></label><label>Gaussian noise SD σ<input id="sigma" type="number" min="0" step="any" value="0.1" required></label><label>Measurement seed<input id="noise-seed" type="number" min="0" max="4294967295" step="1" value="0" required></label></div>
-<label><input id="calibrate-source" type="checkbox" checked> Calibrate M from drawing</label>
-<div class="actions"><button id="generate-scan" class="primary" type="submit" disabled>Generate scan</button><button id="new-observation" type="button" disabled>Create observation with these noise settings</button><button id="new-noise" type="button" disabled>New noise realization</button></div>
+<div class="settings scan-parameters"><label>Projection angles<input id="n-angles" type="number" min="1" max="360" step="1" value="180" required></label><label>Detector count<input id="n-detectors" type="number" min="2" max="256" step="1" value="95" required></label><label>Gaussian noise SD σ<input id="sigma" type="number" min="0" step="any" value="0.1" required></label><label>Measurement seed<input id="noise-seed" type="number" min="0" max="4294967295" step="1" value="0" required></label></div>
+<label class="calibration-check"><input id="calibrate-source" type="checkbox" checked> Calibrate M from drawing</label>
+<div class="actions"><button id="generate-scan" class="primary" type="submit" disabled>Generate scan</button></div>
 </form>
 <p id="measure-status" role="status" class="hint">No observation selected.</p>
 <div class="settings"><label class="grow">Acquisition<select id="acquisitions"><option value="">Select acquisition</option></select></label><label class="grow">Observed sinogram<select id="measure-observation"><option value="">Select observation</option></select></label></div>
 </div>
 <div id="scan-results" hidden>
-<div class="scan-grid"><section class="panel"><h3>Frozen numerical truth</h3><p class="hint">Simulation / validation · Fixed display range [0, 1]</p><canvas id="scan-truth" class="ct-image" width="32" height="32"></canvas><p id="scan-source" class="hint"></p></section>
-<section class="panel"><h3>Clean sinogram</h3><canvas id="clean-sinogram" class="sinogram" width="180" height="47" aria-label="Clean sinogram"></canvas><p class="sinogram-axes"></p></section>
+<div class="scan-grid"><section class="panel"><h3>Noiseless sinogram</h3><canvas id="clean-sinogram" class="sinogram" width="180" height="47" aria-label="Noiseless sinogram"></canvas><p class="sinogram-axes"></p></section>
 <section class="panel"><h3 id="observed-title">Observed sinogram</h3><canvas id="observed-sinogram" class="sinogram" width="180" height="47" aria-label="Observed sinogram"></canvas><p class="sinogram-axes"></p></section></div>
 <p id="scan-summary" class="hint"></p>
 </div>

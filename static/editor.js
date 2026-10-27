@@ -15,6 +15,8 @@ export class Editor {
     this.canvas = canvas; this.history = new RasterHistory(); this.onChange = onChange; this.onBusy = onBusy;
     this.settings = {tool: 'brush', shade: 255, thickness: 16, mode: 'filled', tolerance: 0};
     this.gesture = null; this.render();
+    canvas.addEventListener('blur', () => canvas.removeAttribute('data-pointer-focus'));
+    canvas.addEventListener('keydown', () => canvas.removeAttribute('data-pointer-focus'));
     canvas.addEventListener('pointerdown', e => this.start(e));
     canvas.addEventListener('pointermove', e => this.move(e));
     canvas.addEventListener('pointerup', e => this.finish(e));
@@ -30,7 +32,7 @@ export class Editor {
   render() { paintRaster(this.canvas, this.history.pixels, 512); }
   start(e) {
     if (this.gesture || e.button !== 0 || !e.isPrimary) return;
-    e.preventDefault(); this.canvas.focus();
+    e.preventDefault(); this.canvas.setAttribute('data-pointer-focus', 'true'); this.canvas.focus();
     this.gesture = {id: e.pointerId, points: [this.point(e)], ...this.settings};
     this.canvas.setPointerCapture(e.pointerId); this.onBusy(true); this.preview();
   }

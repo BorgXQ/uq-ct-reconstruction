@@ -30,7 +30,7 @@ export async function restoreCoverage(a){
   const records=await get('/api/validation-studies');if(token!==revision)return;
   const match=records.studies.filter(s=>s.plan.template_id===a.analysis_id&&s.plan.protocol==='fixed_algorithm'&&s.plan.comparison==='common_k'&&s.plan.iterations===a.iteration&&s.plan.methods.includes('corrected')).at(-1);
   if(!match){status(a,'No coverage study saved for this reconstruction. Run reconstruction to calculate coverage.');return;}
-  const study=await get('/api/validation-studies/'+match.study_id+'?arrays=1');if(token===revision)render(study,a);
+  const study=await get('/api/validation-studies/'+match.study_id+'?arrays=1');if(token===revision){render(study,a);return study.status==='completed'&&study.completed_trials===study.plan.trials;}
 }
 export async function runCoverage(a,trials){
   if(!a.center||!a.intervals_available){status(a,'Coverage unavailable: no selected reconstruction with confidence intervals.');return;}
@@ -38,7 +38,7 @@ export async function runCoverage(a,trials){
   try{
     const {result:job}=await api('/api/validation-studies',{request_id:crypto.randomUUID(),template_id:a.analysis_id,template_kind:'randomized',protocol:'fixed_algorithm',comparison:'common_k',trials,iterations:a.iteration,root_seed:crypto.getRandomValues(new Uint32Array(1))[0],methods:['corrected'],scope:'intervals',purpose:'exploratory_study',pixels:[],representatives:[],diagnostics:'none',diagnostic_iterations:[],reference:false});
     const done=await watch(job);
-    if(done.result?.study_id){const study=await get('/api/validation-studies/'+done.result.study_id+'?arrays=1');if(selected===a.analysis_id)render(study,a);}
+    if(done.result?.study_id){const study=await get('/api/validation-studies/'+done.result.study_id+'?arrays=1');if(selected===a.analysis_id){render(study,a);return study.status==='completed'&&study.completed_trials===study.plan.trials;}}
     else status(a,`Coverage validation ${done.status}: ${done.error?.message||'no completed coverage result'}. Reconstruction remains available.`);
   }catch(e){status(a,'Coverage validation failed: '+e.message+'. Reconstruction remains available.');}
   finally{running.delete(a.analysis_id);}

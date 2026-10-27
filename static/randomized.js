@@ -1,16 +1,19 @@
+const displayNumber=value=>value==null?'unavailable':String(Number(Number(value).toFixed(4)));
 import {observationChanged,sourceReady,calibratedSource} from './source-calibration.js';
 import {runCoverage,restoreCoverage,clearCoverage} from './validation.js';
 import {rowPlot} from './validation-presentation.js';
-import {api,get,watch} from './ct.js';
+import {api,get,watch,reconstructionProgress} from './ct.js';
 import {mapBytes} from './exact-view.js';
 const $=id=>document.getElementById(id),num=id=>Number($(id).value),uid=()=>crypto.randomUUID();
+let completedSignature=null;
 let rankResolution=null,prepared=null,preparedSignature=null,preparing=false,finalizing=false;
 const preparationSignature=()=>JSON.stringify([...$('rq-form').querySelectorAll('input,select')].map(e=>[e.id,e.value]));
 let observations=[],truth=null,pendingObservation=null,base=null,view=null,generation=0,serial=0,signature=null;
 const guarded=fn=>async(...args)=>{try{await fn(...args);}catch(e){$('rq-error').textContent=e.message;}};
 const formSignature=()=>JSON.stringify([...document.querySelectorAll('#rq-form input,#rq-form select,#rq-final-form input')].map(e=>[e.id,e.type==='checkbox'?e.checked:e.value]));
-function options(id,rows,key,label){const el=$(id),old=el.value;el.replaceChildren(new Option('Select a record',''));for(const r of rows)el.add(new Option(label(r),r[key]));if(rows.some(r=>r[key]===old))el.value=old;}
+function options(id,rows,key,label){const el=$(id),old=el.value;el.replaceChildren(new Option('Select a record',''));for(const r of [...rows].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))))el.add(new Option(label(r),r[key]));if(rows.some(r=>r[key]===old))el.value=old;}
 function controls(){
+  reconstructionProgress(!preparing&&!finalizing&&completedSignature!==null&&completedSignature===formSignature());
   const automatic=$('rq-mode').value==='automatic';
   $('rq-k-label').hidden=automatic;$('rq-budget-label').hidden=!automatic;
   $('rq-k').disabled=automatic;$('rq-k').required=!automatic;
@@ -18,7 +21,7 @@ function controls(){
   const o=observations.find(o=>o.observation_id===$('rq-observation').value);
   if(o&&o.resolution!==rankResolution){$('rq-rank').value=({16:32,32:64,64:128,128:256})[o.resolution]??Math.min(128,o.resolution*2);rankResolution=o.resolution;}
   if(o)$('rq-rank').max=o.resolution**2-Number($('rq-p').value);
-  $('rq-context').textContent=o?`${o.resolution} × ${o.resolution}; observation ${o.observation_id.slice(0,8)}; noise SD ${o.noise.sigma}.`:'Select an observation from Measure.';
+  $('rq-context').textContent=o?`${o.observation_id.slice(0,8)} · ${o.resolution} × ${o.resolution} · σ ${o.noise.sigma}`:'Select an observation from Measure.';
   $('rq-submit').disabled=!o||!sourceReady()||preparing;
   $('rq-finalize').disabled=finalizing||preparing||!prepared||preparedSignature!==preparationSignature()||prepared.eta_calibration?.eta==null;
   if(prepared&&preparedSignature!==preparationSignature()){
@@ -46,7 +49,7 @@ function request(){
 }
 $('rq-form').onsubmit=guarded(async e=>{
   e.preventDefault();const [url,body]=request(),g=++generation,sig=preparationSignature();
-  prepared=null;preparedSignature=null;preparing=true;$('rq-eta').value='';delete $('rq-eta').dataset.help;
+  completedSignature=null;prepared=null;preparedSignature=null;preparing=true;$('rq-eta').value='';delete $('rq-eta').dataset.help;
   $('rq-error').textContent='';$('rq-results').hidden=true;clearCoverage();controls();
   $('rq-preparation-status').textContent='Selecting K and calibrating η…';
   try{
@@ -56,23 +59,25 @@ $('rq-form').onsubmit=guarded(async e=>{
     const a=await get('/api/randomized-analyses/'+done.result.analysis_id);if(g!==generation)return;
     if(a.status!=='completed'){$('rq-preparation-status').textContent='No stopping crossing within the budget. No K or η was substituted.';return;}
     prepared=a;preparedSignature=sig;const c=a.eta_calibration;
-    $('rq-eta').value=c?.eta??'';
-    $('rq-eta').dataset.help=`At K = ${a.iteration}: retained-bias norm ${c.actual_retained_bias_norm.toPrecision(6)}; omitted-bias norm ${c.actual_omitted_bias_norm.toPrecision(6)}. η = omitted / retained. Retained bound ${c.retained_bound?.toPrecision(6)??'unavailable'}: ${c.retained_assumption_supported?'passes':'fails or unresolved'}. Drawing-calibrated; not a theoretical guarantee.`;
-    $('rq-preparation-status').textContent=`K = ${a.iteration}; η = ${c.eta==null?'unavailable ('+c.ratio_status+')':c.eta.toPrecision(6)}. Retained-bias bound ${c.retained_assumption_supported?'passes this drawing check.':'fails or is unresolved; calibrated η does not repair it. Intervals remain exploratory.'}`;
+    $('rq-eta').value=c?.eta==null?'':displayNumber(c.eta);
+    $('rq-eta').dataset.help=`At K = ${a.iteration}: retained-bias norm ${displayNumber(c.actual_retained_bias_norm)}; omitted-bias norm ${displayNumber(c.actual_omitted_bias_norm)}. η = omitted / retained. Retained bound ${displayNumber(c.retained_bound)}: ${c.retained_assumption_supported?'passes':'fails or unresolved'}. Drawing-calibrated; not a theoretical guarantee.`;
+    $('rq-preparation-status').textContent=`K = ${a.iteration}; η = ${c.eta==null?'unavailable ('+c.ratio_status+')':displayNumber(c.eta)}. Retained-bias bound ${c.retained_assumption_supported?'passes this drawing check.':'fails or is unresolved; calibrated η does not repair it. Intervals remain exploratory.'}`;
   }finally{preparing=false;if(g!==generation)$('rq-preparation-status').textContent='Settings changed during preparation. Prepare again for current settings.';else if(!prepared&&$('rq-preparation-status').textContent.startsWith('Selecting'))$('rq-preparation-status').textContent='Preparation did not complete. See the error or job status, then retry.';controls();}
 });
 $('rq-final-form').onsubmit=guarded(async e=>{
   e.preventDefault();if(!prepared||preparedSignature!==preparationSignature()||prepared.eta_calibration?.eta==null)throw Error('Complete stage 1 with current settings first.');
-  const captured=prepared,g=generation,alpha=num('rq-alpha'),trials=num('rq-trials'),sig=formSignature();finalizing=true;controls();$('rq-error').textContent='';
+  const captured=prepared,g=generation,alpha=num('rq-alpha'),trials=num('rq-trials'),sig=formSignature();completedSignature=null;finalizing=true;controls();$('rq-error').textContent='';
   try{
     const {result:job}=await api(`/api/randomized-analyses/${captured.analysis_id}/finalize`,{request_id:uid(),alpha});
     const done=await watch(job);if(done.status!=='completed')throw Error(done.error?.message||`Intervals ${done.status}.`);
     const a=await get('/api/randomized-analyses/'+done.result.analysis_id);await lists();
     if(g!==generation||prepared!==captured)return;
-    await show(a.analysis_id,sig);await runCoverage(a,trials);
+    await show(a.analysis_id,sig);const complete=await runCoverage(a,trials);
+    if(complete&&g===generation&&prepared===captured&&sig===formSignature())completedSignature=sig;
   }finally{finalizing=false;controls();}
 });
 async function show(aid,sig=null){
+  completedSignature=null;reconstructionProgress(false);
   const token=++serial;truth=null;base=view=null;$('rq-results').hidden=true;clearCoverage();
   if(!aid)return;
   const a=await get('/api/randomized-analyses/'+aid);
@@ -81,7 +86,8 @@ async function show(aid,sig=null){
   truth=snapshot.pixels;base=view=a;signature=sig;$('rq-analyses').value=aid;$('rq-results').hidden=false;
   $('rq-main-row').value=Math.floor(a.shape[0]/2);$('rq-main-row').max=a.shape[0]-1;
   renderPrimary();controls();$('rq-status').textContent=`Saved reconstruction · ${a.status}`;
-  await restoreCoverage(a);
+  const restoreSignature=formSignature(),complete=await restoreCoverage(a);
+  if(complete&&token===serial&&restoreSignature===formSignature()){completedSignature=restoreSignature;controls();}
 }
 $('rq-analyses').onchange=guarded(()=>show($('rq-analyses').value));$('rq-refresh').onclick=guarded(lists);
 

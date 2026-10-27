@@ -1,3 +1,4 @@
+const displayNumber=value=>value==null?'unavailable':String(Number(Number(value).toFixed(4)));
 import {api,watch} from './ct.js';
 const $=id=>document.getElementById(id);
 let observation='',token=0,evidence=null,activeJob=null,notify=()=>{},message='Select an observation to choose the source bound.';
@@ -23,10 +24,10 @@ export function calibratedSource(){
 }
 function render(){
   const m=manual();
-  $('rq-calibrated-M').value=compatible()?evidence.M:'';
+  $('rq-calibrated-M').value=compatible()?displayNumber(evidence.M):'';
   const selection=m.filled
-    ? (m.valid?`Using manual M = ${m.value}. This overrides calibration; it is a declared assumption, not a verified source bound.`:'Manual M must be a finite number ≥ 0. Clear it to use calibration.')
-    : (compatible()?`Using calibrated M = ${evidence.M}.`:'No usable M selected. Enter manual M or calculate it from the drawing.');
+    ? (m.valid?`Using manual M = ${displayNumber(m.value)}. This overrides calibration; it is a declared assumption, not a verified source bound.`:'Manual M must be a finite number ≥ 0. Clear it to use calibration.')
+    : (compatible()?`Using calibrated M = ${displayNumber(evidence.M)}.`:'No usable M selected. Enter manual M or calculate it from the drawing.');
   $('rq-source-status').textContent=`${selection} ${message}`;
   notify();
 }

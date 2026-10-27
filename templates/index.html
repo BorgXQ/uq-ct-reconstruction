@@ -1,33 +1,31 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Can We Trust This CT Reconstruction?</title><link rel="stylesheet" href="/static/style.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncertainty Quantification in CT Reconstruction</title><link rel="stylesheet" href="/static/style.css"></head>
 <body>
-<header><div class="eyebrow">COMPUTATIONAL IMAGING / LOCAL LAB</div><h1>Can We Trust This CT Reconstruction?</h1><p>Start with an object you know. Draw it, inspect its numerical grid, then freeze the ground truth.</p></header>
-<nav aria-label="Experiment workflow"><button id="nav-draw" data-workspace="draw" aria-current="step">01 <strong>Draw</strong> <small id="draw-state">ready</small></button><button id="nav-measure" data-workspace="measure" disabled>02 Measure <small id="measure-nav-state">not_ready</small></button><button id="nav-uq" data-workspace="uq" disabled>03 Reconstruct <small id="uq-nav-state">not_ready</small></button></nav>
+<header><div class="eyebrow">STATISTICAL THEORY PROJECT</div><h1>Uncertainty Quantification in CT Reconstruction</h1></header>
+<nav aria-label="Experiment workflow"><button id="nav-draw" data-workspace="draw" aria-current="step"><span>01 <strong>Draw</strong></span><small id="draw-state">ready</small></button><button id="nav-measure" data-workspace="measure" disabled><span>02 <strong>Measure</strong></span><small id="measure-nav-state">not ready</small></button><button id="nav-uq" data-workspace="uq" disabled><span>03 <strong>Reconstruct</strong></span><small id="uq-nav-state">not ready</small></button></nav>
 <main><div id="ct-error" role="alert" hidden></div><details id="job-panel" class="panel" hidden><summary>Numerical jobs</summary><div id="jobs"></div></details><section id="draw-workspace">
 <div class="workspace draw-grid">
-<section class="panel"><div class="panel-title"><div><span class="eyebrow">EDITABLE SOURCE</span><h2>Draw your object</h2></div><span class="tag">512 × 512</span></div>
-<fieldset id="paint-controls"><legend>Drawing tools</legend>
-<button id="load-phantom" type="button">Load modified Shepp–Logan phantom</button><p class="hint">Replaces the drawing; Undo restores it. Editable 8-bit source, averaged to the selected numerical grid when frozen.</p>
+<section class="panel"><div class="panel-title"><div><span class="eyebrow">01A</span><h2>Create source image</h2></div><span class="tag">512 × 512</span></div>
+<div class="draw-card-controls"><fieldset id="paint-controls"><legend>Drawing tools</legend>
+<button id="load-phantom" type="button">Load modified Shepp–Logan phantom</button>
 <div class="tools" role="group" aria-label="Drawing tool"><button data-tool="brush" aria-pressed="true">Brush</button><button data-tool="eraser" aria-pressed="false">Eraser</button><button data-tool="circle" aria-pressed="false">Circle</button></div>
-<div class="palette" aria-label="Quick grayscale palette"><button data-shade="0" style="--shade:0">0</button><button data-shade="64" style="--shade:64">64</button><button data-shade="128" style="--shade:128">128</button><button data-shade="192" style="--shade:192">192</button><button data-shade="255" style="--shade:255">255</button></div>
-<output id="shade-value" aria-live="polite">255 / 255 = 1</output>
-</fieldset>
-<p id="tool-hint" class="hint">Drag to paint. Click for a round dab. Escape cancels a gesture.</p>
+<div class="draw-palette-row"><div class="palette" aria-label="Quick grayscale palette"><button data-shade="0" style="--shade:0">0</button><button data-shade="64" style="--shade:64">64</button><button data-shade="128" style="--shade:128">128</button><button data-shade="192" style="--shade:192">192</button><button data-shade="255" style="--shade:255">255</button></div>
+<output id="shade-value" aria-live="polite">255 / 255 = 1</output></div>
+</fieldset></div>
 <canvas id="editor" width="512" height="512" tabindex="0" aria-label="Editable grayscale drawing, 512 by 512"></canvas>
-<div class="actions"><button id="undo" disabled>Undo</button><button id="redo" disabled>Redo</button><button id="clear">Clear</button><span id="revision" class="muted">Revision 0</span></div>
+<div class="actions"><button id="undo" disabled>Undo</button><button id="redo" disabled>Redo</button><button id="clear">Clear</button></div>
 </section>
-<section class="panel"><div class="panel-title"><div><span class="eyebrow">NUMERICAL IMAGE</span><h2>Inspect the actual values</h2></div><span id="dimensions" class="tag">64 × 64</span></div>
-<div class="settings numerical-controls"><label>Numerical resolution<select id="resolution"><option value="16">16 × 16</option><option value="32">32 × 32</option><option value="64" selected>64 × 64</option><option value="128">128 × 128</option></select></label><button class="primary" id="freeze">Freeze image</button></div>
-<p id="freeze-status" role="status" class="hint">Freeze stores a separate, immutable numerical image.</p>
+<section class="panel"><div class="panel-title"><div><span class="eyebrow">01B</span><h2>Inspect pixelated ground truth</h2></div><span id="dimensions" class="tag">16 × 16</span></div>
+<div class="draw-card-controls"><div class="settings numerical-controls"><label>Numerical resolution<select id="resolution"><option value="16" selected>16 × 16</option><option value="32">32 × 32</option><option value="64">64 × 64</option><option value="128">128 × 128</option></select></label><button class="primary" id="freeze">Freeze image</button></div>
 <div class="tabs" role="group" aria-label="Numerical image source"><button id="draft-tab" aria-pressed="true">Current draft</button><button id="frozen-tab" aria-pressed="false">Frozen snapshot</button></div>
-<div class="settings"><label class="grow">Snapshot<select id="snapshots"><option value="">No snapshot selected</option></select></label><button id="refresh-snapshots">Refresh list</button><label class="check"><input type="checkbox" id="grid">Grid</label></div>
-<div id="errors" role="alert" hidden></div><button id="retry" hidden>Retry preview</button>
-<p id="preview-status" role="status" class="hint">Computing blank draft…</p>
-<div class="numerical-wrap"><canvas id="numerical" width="64" height="64" aria-label="Numerical pixel image"></canvas><canvas id="overlay" width="512" height="512" aria-hidden="true"></canvas><div id="empty-numerical">Loading numerical image…</div></div>
+<div class="draw-snapshot-row"><div class="settings snapshot-controls"><label class="grow">Snapshot<select id="snapshots"><option value="">Select a frozen snapshot</option></select></label><button id="refresh-snapshots">Refresh list</button><label class="check"><input type="checkbox" id="grid">Grid</label></div>
+<div id="errors" role="alert" hidden></div><button id="retry" hidden>Retry preview</button></div>
+</div>
+<div class="numerical-wrap"><canvas id="numerical" width="16" height="16" aria-label="Numerical pixel image"></canvas><canvas id="overlay" width="512" height="512" aria-hidden="true"></canvas><div id="empty-numerical">Loading numerical image…</div></div>
 
-<p class="hint">Display shades are rounded to 8 bits. Inspection uses the stored float64 values.</p>
+<div class="draw-card-footer"><p id="freeze-status" role="status" class="hint"></p><p id="preview-status" role="status" class="hint"></p><p class="hint">Display shades are rounded to 8 bits. Inspection uses the stored float64 values.</p></div>
 </section>
 </div>
-</section>{% include "ct.html" %}{% include "reconstruct.html" %}</main><footer>MILESTONE 007 · RECONSTRUCT</footer><script src="/static/vendor/plotly-basic.min.js"></script><script type="module" src="/static/app.js"></script>
+</section>{% include "ct.html" %}{% include "reconstruct.html" %}</main><script src="/static/vendor/plotly-basic.min.js"></script><script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/ct.js"></script><script type="module" src="/static/randomized.js"></script><script type="module" src="/static/parameter-help.js"></script></body></html>

@@ -28,7 +28,6 @@ function controls() {
   $('undo').disabled = busy || !editor.history.undoStack.length;
   $('redo').disabled = busy || !editor.history.redoStack.length;
   $('clear').disabled = busy;
-  $('revision').textContent = `Revision ${editor.history.revision}`;
 }
 function changed() {
   generation++; previewState = 'pending'; controls(); render();
@@ -63,9 +62,10 @@ function render() {
   const data = current();
   $('draft-tab').setAttribute('aria-pressed', mode === 'draft');
   $('frozen-tab').setAttribute('aria-pressed', mode === 'frozen');
+  $('preview-status').dataset.state = previewState === 'ready' && draftGeneration === generation ? 'ready' : previewState;
   $('preview-status').textContent = mode === 'draft'
-    ? (previewState === 'ready' && draftGeneration === generation ? 'Current draft · Backend conversion complete.'
-      : previewState === 'error' ? 'Preview unavailable for current input · Showing previous input, if available.' : 'Updating · Showing previous input, if available.')
+    ? (previewState === 'ready' && draftGeneration === generation ? ''
+      : previewState === 'error' ? 'Preview unavailable for current input · Showing previous input, if available.' : '')
     : frozenUnavailable ? 'Snapshot unavailable · Refresh the list or freeze a new image.' : matches();
   $('empty-numerical').hidden = Boolean(data);
   if (!data) {
@@ -88,7 +88,7 @@ function overlay() {
     for (let i=1; i<data.resolution; i++) { ctx.moveTo(i*cell,0);ctx.lineTo(i*cell,512);ctx.moveTo(0,i*cell);ctx.lineTo(512,i*cell); } ctx.stroke();
   }
 }
-async function refreshSnapshots(keepId = frozen?.snapshot_id) {
+async function refreshSnapshots(keepId = frozen?.snapshot_id, openMeasure = false) {
   const result = await api('/api/snapshots');
   $('snapshots').replaceChildren(new Option('Select a frozen snapshot', ''));
   for (const [i, item] of result.snapshots.entries()) {
@@ -96,7 +96,7 @@ async function refreshSnapshots(keepId = frozen?.snapshot_id) {
   }
   if (keepId && result.snapshots.some(item => item.snapshot_id === keepId)) $('snapshots').value = keepId;
   else if (keepId) { frozenUnavailable = true; render(); }
-  window.dispatchEvent(new CustomEvent('ct-snapshots', {detail: {records: result.snapshots, selectedId: keepId}}));
+  window.dispatchEvent(new CustomEvent('ct-snapshots', {detail: {records: result.snapshots, selectedId: keepId, openMeasure}}));
 }
 async function selectSnapshot(id) {
   const serial = ++selectionSerial;
@@ -116,16 +116,14 @@ $('freeze').onclick = async () => {
     if (result.request_id !== input.request_id || result.resolution !== input.numerical_resolution || !result.snapshot_id) throw new Error('Unexpected freeze response. Refresh the snapshot list.');
     ++selectionSerial; frozen = result; frozenUnavailable = false; mode = 'frozen';
     report(''); $('freeze-status').textContent = `Frozen snapshot ${result.snapshot_id.slice(0,8)} · Stored in this server process.`; render();
-    try { await refreshSnapshots(result.snapshot_id); } catch(error) { report(`Image frozen, but list refresh failed: ${error.message}`); }
+    try { await refreshSnapshots(result.snapshot_id, true); } catch(error) { report(`Image frozen, but list refresh failed: ${error.message}`); }
   } catch(error) { $('freeze-status').textContent = 'Freeze failed. Previous snapshots preserved; use Freeze image to retry.'; report(error.message); }
   finally { freezing = false; controls(); }
 };
-const hints = {brush:'Drag to paint. Click for a round dab. Escape cancels a gesture.', eraser:'Paints black. Your painting shade is preserved.', circle:'Press at the center, then drag outward to set the radius. Escape cancels.'};
 document.querySelectorAll('[data-tool]').forEach(button => button.onclick = () => {
   if(busy) return;
   editor.settings.tool = button.dataset.tool;
   document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b === button));
-  $('tool-hint').textContent = hints[button.dataset.tool];
 });
 function setShade(shade) {
   editor.settings.shade = shade;

@@ -168,3 +168,16 @@ main{padding-bottom:64px}
 .example-loader{display:flex;align-items:center;gap:10px;min-width:0;align-self:center}
 .example-loader select{flex:1;min-width:0;width:100%}
 .example-loader button{flex:none}
+
+/* One control size for selectors, with matching Load/Refresh action columns. */
+:root{--select-height:40px;--select-action-width:132px;--select-gap:10px}
+select{height:var(--select-height);font-size:14px;line-height:20px;padding:8px 10px;min-width:0}
+.example-loader{display:grid;grid-template-columns:minmax(0,1fr) var(--select-action-width);gap:var(--select-gap);width:100%}
+.example-loader select{width:100%}
+.example-loader button,.snapshot-controls > button{height:var(--select-height);width:var(--select-action-width);font-size:14px;white-space:nowrap;padding:8px 10px}
+#load-phantom{justify-self:stretch}
+.settings.snapshot-controls{display:grid;grid-template-columns:minmax(0,1fr) var(--select-action-width);grid-template-rows:auto var(--select-height);gap:6px var(--select-gap);align-items:center}
+.snapshot-controls .grow{grid-column:1;grid-row:1 / span 2;display:grid;grid-template-rows:subgrid;min-width:0;margin:0;align-self:stretch}
+.snapshot-controls .grow select{grid-row:2;width:100%}
+.snapshot-controls > button{grid-column:2;grid-row:2}
+.snapshot-controls .check{grid-column:2;grid-row:1;min-height:0;justify-self:end;margin:0}

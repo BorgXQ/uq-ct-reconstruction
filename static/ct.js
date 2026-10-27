@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id);
 let snapshots=[],acquisitions=[],observations=[],draftState=null;
 let scan=null;
 let drawCompleted=false,measureCompleted=false,reconstructionCompleted=false;
-let measurePending=false;
+let measurePending=false,inspectionReady=false;
 let measureGeneration=0,observationSerial=0,listSerial=0;
 const polled=new Set();
 function message(error){$('ct-error').hidden=!error;$('ct-error').textContent=error||'';}
@@ -24,6 +24,8 @@ function fillOptions(id,records,key,label){
 }
 function availability(){
   $('nav-measure').disabled=!snapshots.length;$('nav-uq').disabled=!observations.length;
+  $('nav-inspect').disabled=!inspectionReady;
+  $('inspect-nav-state').textContent=!inspectionReady?'not ready':reconstructionCompleted?'completed':'ready';
   $('draw-state').textContent=drawCompleted?'completed':'ready';
   $('measure-nav-state').textContent=!snapshots.length?'not ready':measureCompleted?'completed':'ready';
   $('uq-nav-state').textContent=!observations.length?'not ready':reconstructionCompleted?'completed':'ready';
@@ -67,7 +69,7 @@ async function refresh(){
   if(oldSource&&!$('measure-snapshot').value)selectSource('');
   availability();window.dispatchEvent(new CustomEvent('ct-records',{detail:{observations}}));
 }
-export function reconstructionProgress(completed){reconstructionCompleted=Boolean(completed);availability();}
+export function reconstructionProgress(completed,ready=false){reconstructionCompleted=Boolean(completed);inspectionReady=Boolean(ready||completed);availability();}
 async function watch(job,done){
   const id=job.job_id;
   if(polled.has(id))return;polled.add(id);
@@ -120,7 +122,7 @@ function safe(handler){return async e=>{try{await handler(e);}catch(error){messa
 document.querySelectorAll('[data-workspace]').forEach(button=>button.onclick=()=>{
   if(document.querySelector('#paint-controls').disabled)return;
   $('job-panel').hidden=button.dataset.workspace==='draw';
-  for(const name of ['draw','measure','uq'])$(name+'-workspace').hidden=name!==button.dataset.workspace;
+  for(const name of ['draw','measure','uq','inspect'])$(name+'-workspace').hidden=name!==button.dataset.workspace;
   const source=snapshots.find(s=>s.snapshot_id===$('measure-snapshot').value);
   if(button.dataset.workspace!=='draw'&&source&&draftState?.ready&&source.content_hash===draftState.content_hash&&source.source_hash===draftState.source_hash)drawCompleted=true;
   if(button.dataset.workspace==='uq'&&scan){
@@ -129,6 +131,7 @@ document.querySelectorAll('[data-workspace]').forEach(button=>button.onclick=()=
   }
   availability();
   document.querySelectorAll('[data-workspace]').forEach(b=>{if(b===button)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');});
+  window.dispatchEvent(new CustomEvent('ct-workspace-selected',{detail:button.dataset.workspace}));
 });
 window.addEventListener('ct-draft',e=>{
   if(!e.detail.ready||e.detail.content_hash!==draftState?.content_hash||e.detail.source_hash!==draftState?.source_hash)drawCompleted=false;

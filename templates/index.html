@@ -3,7 +3,7 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uncertainty Quantification in CT Reconstruction</title><link rel="stylesheet" href="/static/style.css"></head>
 <body>
 <header><div class="eyebrow">STATISTICAL THEORY PROJECT</div><h1>Uncertainty Quantification in CT Reconstruction</h1></header>
-<nav aria-label="Experiment workflow"><button id="nav-draw" data-workspace="draw" aria-current="step"><span>01 <strong>Draw</strong></span><small id="draw-state">ready</small></button><button id="nav-measure" data-workspace="measure" disabled><span>02 <strong>Measure</strong></span><small id="measure-nav-state">not ready</small></button><button id="nav-uq" data-workspace="uq" disabled><span>03 <strong>Reconstruct</strong></span><small id="uq-nav-state">not ready</small></button></nav>
+<nav aria-label="Experiment workflow"><button id="nav-draw" data-workspace="draw" aria-current="step"><span>01 <strong>Draw</strong></span><small id="draw-state">ready</small></button><button id="nav-measure" data-workspace="measure" disabled><span>02 <strong>Measure</strong></span><small id="measure-nav-state">not ready</small></button><button id="nav-uq" data-workspace="uq" disabled><span>03 <strong>Reconstruct</strong></span><small id="uq-nav-state">not ready</small></button><button id="nav-inspect" data-workspace="inspect" disabled><span>04 <strong>Inspect</strong></span><small id="inspect-nav-state">not ready</small></button></nav>
 <main><div id="ct-error" role="alert" hidden></div><details id="job-panel" class="panel" hidden><summary>Numerical jobs</summary><div id="jobs"></div></details><section id="draw-workspace">
 <div class="workspace draw-grid">
 <section class="panel"><div class="panel-title"><div><span class="eyebrow">01A</span><h2>Create source image</h2></div><span class="tag">512 × 512</span></div>
@@ -27,5 +27,5 @@
 <div class="draw-card-footer"><p id="freeze-status" role="status" class="hint"></p><p id="preview-status" role="status" class="hint"></p><p class="hint">Display shades are rounded to 8 bits. Inspection uses the stored float64 values.</p></div>
 </section>
 </div>
-</section>{% include "ct.html" %}{% include "reconstruct.html" %}</main><script src="/static/vendor/plotly-basic.min.js"></script><script type="module" src="/static/app.js"></script>
+</section>{% include "ct.html" %}{% include "reconstruct.html" %}{% include "inspect.html" %}</main><script src="/static/vendor/plotly-basic.min.js"></script><script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/ct.js"></script><script type="module" src="/static/randomized.js"></script><script type="module" src="/static/parameter-help.js"></script></body></html>

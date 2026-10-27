@@ -5,7 +5,7 @@ import {rowPlot} from './validation-presentation.js';
 import {api,get,watch,reconstructionProgress} from './ct.js';
 import {mapBytes} from './exact-view.js';
 const $=id=>document.getElementById(id),num=id=>Number($(id).value),uid=()=>crypto.randomUUID();
-let completedSignature=null;
+let completedSignature=null,calculationSignature=null;
 let rankResolution=null,prepared=null,preparedSignature=null,preparing=false,finalizing=false;
 const preparationSignature=()=>JSON.stringify([...$('rq-form').querySelectorAll('input,select')].map(e=>[e.id,e.value]));
 let observations=[],truth=null,pendingObservation=null,base=null,view=null,generation=0,serial=0,signature=null;
@@ -13,7 +13,6 @@ const guarded=fn=>async(...args)=>{try{await fn(...args);}catch(e){$('rq-error')
 const formSignature=()=>JSON.stringify([...document.querySelectorAll('#rq-form input,#rq-form select,#rq-final-form input')].map(e=>[e.id,e.type==='checkbox'?e.checked:e.value]));
 function options(id,rows,key,label){const el=$(id),old=el.value;el.replaceChildren(new Option('Select a record',''));for(const r of [...rows].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))))el.add(new Option(label(r),r[key]));if(rows.some(r=>r[key]===old))el.value=old;}
 function controls(){
-  reconstructionProgress(!preparing&&!finalizing&&completedSignature!==null&&completedSignature===formSignature());
   const automatic=$('rq-mode').value==='automatic';
   $('rq-k-label').hidden=automatic;$('rq-budget-label').hidden=!automatic;
   $('rq-k').disabled=automatic;$('rq-k').required=!automatic;
@@ -28,6 +27,9 @@ function controls(){
     prepared=null;preparedSignature=null;$('rq-eta').value='';delete $('rq-eta').dataset.help;
     $('rq-preparation-status').textContent='Stage 1 settings changed. Prepare again to select a matching K and η.';
   }
+  reconstructionProgress(!preparing&&!finalizing&&completedSignature!==null&&completedSignature===formSignature(),
+    !preparing&&Boolean((calculationSignature!==null&&calculationSignature===formSignature())||(base?.center&&(signature===null||signature===formSignature()))));
+  $('inspect-placeholder').hidden=!$('rq-results').hidden;
   observationChanged(controls);
   if(base)$('rq-mismatch').textContent=signature===formSignature()?'Displayed result matches submitted controls.':'Displayed result keeps its captured settings. Recalculate to apply current controls.';
 }
@@ -49,7 +51,7 @@ function request(){
 }
 $('rq-form').onsubmit=guarded(async e=>{
   e.preventDefault();const [url,body]=request(),g=++generation,sig=preparationSignature();
-  completedSignature=null;prepared=null;preparedSignature=null;preparing=true;$('rq-eta').value='';delete $('rq-eta').dataset.help;
+  base=view=null;calculationSignature=null;completedSignature=null;prepared=null;preparedSignature=null;preparing=true;$('rq-eta').value='';delete $('rq-eta').dataset.help;
   $('rq-error').textContent='';$('rq-results').hidden=true;clearCoverage();controls();
   $('rq-preparation-status').textContent='Selecting K and calibrating η…';
   try{
@@ -66,7 +68,7 @@ $('rq-form').onsubmit=guarded(async e=>{
 });
 $('rq-final-form').onsubmit=guarded(async e=>{
   e.preventDefault();if(!prepared||preparedSignature!==preparationSignature()||prepared.eta_calibration?.eta==null)throw Error('Complete stage 1 with current settings first.');
-  const captured=prepared,g=generation,alpha=num('rq-alpha'),trials=num('rq-trials'),sig=formSignature();completedSignature=null;finalizing=true;controls();$('rq-error').textContent='';
+  const captured=prepared,g=generation,alpha=num('rq-alpha'),trials=num('rq-trials'),sig=formSignature();calculationSignature=sig;completedSignature=null;finalizing=true;controls();$('rq-error').textContent='';
   try{
     const {result:job}=await api(`/api/randomized-analyses/${captured.analysis_id}/finalize`,{request_id:uid(),alpha});
     const done=await watch(job);if(done.status!=='completed')throw Error(done.error?.message||`Intervals ${done.status}.`);
@@ -75,9 +77,10 @@ $('rq-final-form').onsubmit=guarded(async e=>{
     await show(a.analysis_id,sig);const complete=await runCoverage(a,trials);
     if(complete&&g===generation&&prepared===captured&&sig===formSignature())completedSignature=sig;
   }finally{finalizing=false;controls();}
+  if(completedSignature===sig&&g===generation){$('nav-inspect').click();$('nav-inspect').focus();}
 });
 async function show(aid,sig=null){
-  completedSignature=null;reconstructionProgress(false);
+  completedSignature=null;reconstructionProgress(false,calculationSignature!==null&&calculationSignature===formSignature());
   const token=++serial;truth=null;base=view=null;$('rq-results').hidden=true;clearCoverage();
   if(!aid)return;
   const a=await get('/api/randomized-analyses/'+aid);
@@ -110,3 +113,5 @@ controls();
 // Keep the chart dimensions aligned with the square image after layout changes.
 let primaryWidth=0;
 new ResizeObserver(entries=>{const width=entries[0].contentRect.width;if(width>0&&width!==primaryWidth){primaryWidth=width;if(view?.center)renderPrimary();}}).observe(document.querySelector('.rq-primary-grid'));
+
+window.addEventListener('ct-workspace-selected',e=>{if(e.detail==='inspect'&&view?.center)requestAnimationFrame(()=>{renderPrimary();Plotly.Plots.resize($('rq-row-plot'));});});

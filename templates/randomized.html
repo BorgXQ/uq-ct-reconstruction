@@ -43,21 +43,3 @@
   <p id="rq-error" role="alert"></p><p id="rq-status" role="status">No randomized analysis selected.</p>
   <div class="settings snapshot-controls"><label class="grow">Saved reconstruction<select id="rq-analyses"><option value="">Select a result</option></select></label><button id="rq-refresh">Refresh records</button></div>
 </section>
-<section id="rq-results" hidden>
-<section class="panel" id="rq-primary"><h2>Reconstruction</h2><p id="rq-primary-context"></p><p id="rq-mismatch" class="hint"></p><p id="rq-primary-status" role="status"></p>
-<div class="rq-primary-grid">
-<div class="reconstruction-plot-card"><h3>Reconstructed image</h3><div class="image-with-scale"><canvas id="rq-main-image" width="512" height="512" role="img" aria-label="Landweber reconstruction with selected row marked blue"></canvas>{% include 'density-scale.html' %}</div></div>
-<div class="reconstruction-plot-card" id="coverage-panel"><h3 id="coverage-title" aria-live="polite">Empirical coverage</h3><div><p id="coverage-status" role="status">Run reconstruction to calculate coverage.</p><div class="image-with-scale"><canvas id="coverage-image" width="512" height="512" role="img" aria-label="Empirical coverage across all pixels; Viridis from 0% purple to 100% yellow" hidden></canvas><div id="coverage-scale" class="density-scale" role="img" aria-label="Coverage scale from 0% purple to 100% yellow in steps of 10%" hidden><div id="coverage-gradient" class="density-gradient"></div><div class="density-ticks">{% for tick in range(10, -1, -1) %}<span>{{ tick * 10 }}%</span>{% endfor %}</div></div></div></div></div>
-</div>
-<div class="reconstruction-plot-card rq-interval-panel"><h3>Confidence intervals along the selected row</h3>
-<div class="settings"><label>Horizontal row (zero-based)<input id="rq-main-row" type="number" min="0" value="0"></label></div>
-<div id="rq-row-plot" class="interval-chart" role="img" aria-label="Interactive density plot: truth, Landweber mean and confidence interval"></div></div>
-<details id="coverage-diagnostics"><summary>Temporary coverage diagnostics</summary>
-<p id="coverage-diagnostic-summary">Available after repeated-trial validation completes.</p>
-<div class="coverage-diagnostic-grid">
-<div><h3>Mean reconstruction minus truth</h3><p>Red: overestimation. Blue: underestimation. White: near zero. Persistent edge patterns suggest bias. The empirical mean still has sampling error; hover to compare with the noiseless bias.</p><div id="coverage-bias-plot" class="coverage-diagnostic-plot"></div></div>
-<div><h3>Empirical variance minus modeled variance</h3><p>Red: observed noise variance exceeds the corrected variance used in the intervals. Blue: the model allows more noise variance. White: agreement. Hover for both values and their ratio.</p><div id="coverage-variance-plot" class="coverage-diagnostic-plot"></div></div>
-</div>
-<p>These are validation-only comparisons using the known drawing. Variance measures fluctuations around the trial mean, not squared error from truth. Local differences can reflect Monte Carlo variability; pixels are correlated. The noiseless bias is computed at the same K without measurement noise. No interval or stopping setting is changed.</p>
-</details>
-</section></section>

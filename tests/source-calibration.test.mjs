@@ -22,21 +22,21 @@ test('optional calibration, manual precedence, cached fallback and stale jobs',a
   const source=(await readFile(new URL('../static/source-calibration.js',import.meta.url),'utf8')).replace("import {api,watch} from './ct.js';","const {api,watch}=globalThis.__calibrationApi;");
   const mod=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
   const tick=()=>new Promise(resolve=>setImmediate(resolve));
-  const result=(M=8)=>({status:'completed',result:{status:'compatible',M,nu:Number(nu.value),snapshot_id:'drawing',reason:'Numerical check passed.'}});
+  const result=(M=8.123456)=>({status:'completed',result:{status:'compatible',M,nu:Number(nu.value),snapshot_id:'drawing',reason:'Numerical check passed.'}});
   obs.value='one';mod.observationChanged(()=>{});await tick();
   assert.equal(requests,0);assert.equal(mod.sourceReady(),false);
   manual.value='6';manual.fire('input');assert.equal(mod.sourceReady(),true);
   assert.equal(mod.calibratedSource().M,6);assert.match(mod.calibratedSource().provenance,/Manually/);
   enabled.checked=true;enabled.fire('change');await tick();assert.equal(requests,1);
   pending.shift()(result());await tick();
-  assert.equal(manual.value,'6');assert.equal(cal.value,8);assert.equal(mod.calibratedSource().M,6);
-  manual.value='';manual.fire('input');assert.equal(mod.calibratedSource().M,8);
+  assert.equal(manual.value,'6');assert.equal(cal.value,'8.1235');assert.equal(mod.calibratedSource().M,6);
+  manual.value='';manual.fire('input');assert.equal(mod.calibratedSource().M,8.123456);
   manual.value='-1';manual.fire('input');assert.equal(mod.sourceReady(),false);
   manual.value='0';manual.fire('input');assert.equal(mod.calibratedSource().M,0);
   manual.value='';enabled.checked=false;enabled.fire('change');
   nu.value='0.3';nu.fire('input');nu.fire('blur');await tick();
   assert.equal(requests,1);assert.equal(mod.sourceReady(),false);assert.equal(cal.value,'');
-  nu.value='0.5';nu.fire('input');assert.equal(mod.calibratedSource().M,8);
+  nu.value='0.5';nu.fire('input');assert.equal(mod.calibratedSource().M,8.123456);
   obs.value='two';mod.observationChanged(()=>{});await tick();assert.equal(requests,1);assert.equal(mod.sourceReady(),false);
   manual.value='9';manual.fire('input');assert.equal(mod.sourceReady(),true);
   // An explicit request is still available while automatic calibration is disabled.

@@ -8,7 +8,7 @@ const page = await browser.newPage({viewport:{width:1400,height:1200}});
 const errors=[],external=[];
 page.on('pageerror', error=>errors.push(error.message));
 page.on('request', request=>{if(!request.url().startsWith(base))external.push(request.url());});
-const wait = async()=>page.waitForFunction(()=>document.querySelector('#preview-status').textContent.includes('Backend conversion complete'));
+const wait = async()=>page.waitForFunction(()=>document.querySelector('#preview-status').dataset.state === 'ready');
 const draft = async()=>{await page.click('#draft-tab');await wait();};
 const shade = async value=>{await page.fill('#shade',String(value));await page.locator('#shade').press('Tab');};
 const tool = async name=>page.click(`[data-tool=${name}]`);

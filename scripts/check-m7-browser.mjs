@@ -11,7 +11,7 @@ async function finalize(p){const r=await action('#rq-finalize',`/api/randomized-
 async function reconstruct(){return finalize(await prepare());}
 
 try{
- await page.goto(base);await page.waitForFunction(()=>document.querySelector('#preview-status').textContent.includes('Backend conversion complete'));
+ await page.goto(base);await page.waitForFunction(()=>document.querySelector('#preview-status').dataset.state === 'ready');
  assert.equal(await page.locator('nav button').count(),3);assert.match(await page.locator('#nav-uq').innerText(),/03 Reconstruct/);
  for(const id of ['reconstruct-workspace','reconstruction-form','uq-form','rq-route','new-randomized-observation'])assert.equal(await page.locator('#'+id).count(),0);
  await page.selectOption('#resolution','16');await page.click('[data-tool=circle]');const b=await page.locator('#editor').boundingBox();await page.mouse.move(b.x+b.width*.5,b.y+b.height*.5);await page.mouse.down();await page.mouse.move(b.x+b.width*.7,b.y+b.height*.5);await page.mouse.up();
@@ -40,7 +40,7 @@ try{
  const studyCount=(await get('/api/validation-studies')).studies.length;
  const preparation=await prepare();assert.equal(await page.locator('#rq-results').isVisible(),false);
  assert.equal((await get('/api/validation-studies')).studies.length,studyCount);
- assert.equal(Number(await page.inputValue('#rq-eta')),preparation.eta_calibration.eta);
+ assert.equal(Number(await page.inputValue('#rq-eta')),Number(preparation.eta_calibration.eta.toFixed(4)));
  await page.locator('[data-parameter="rq-eta"]').hover();await page.waitForSelector('#parameter-tooltip:not([hidden])');
  assert.match(await page.locator('#parameter-tooltip').textContent(),/retained-bias norm.*omitted-bias norm/);await page.keyboard.press('Escape');
  await page.fill('#rq-alpha','0.1');assert.equal(await page.locator('#rq-finalize').isDisabled(),false);

@@ -12,7 +12,9 @@ async function reconstruct(){return finalize(await prepare());}
 
 try{
  await page.goto(base);await page.waitForFunction(()=>document.querySelector('#preview-status').dataset.state === 'ready');
- assert.equal(await page.locator('nav button').count(),3);assert.match(await page.locator('#nav-uq').innerText(),/03 Reconstruct/);
+ assert.equal(await page.locator('nav button').count(),4);assert.match(await page.locator('#nav-uq').innerText(),/03 Reconstruct/);
+ assert.equal(await page.locator('#nav-inspect').isDisabled(),true);
+ assert.equal(await page.locator('#inspect-nav-state').textContent(),'not ready');
  for(const id of ['reconstruct-workspace','reconstruction-form','uq-form','rq-route','new-randomized-observation'])assert.equal(await page.locator('#'+id).count(),0);
  await page.selectOption('#resolution','16');await page.click('[data-tool=circle]');const b=await page.locator('#editor').boundingBox();await page.mouse.move(b.x+b.width*.5,b.y+b.height*.5);await page.mouse.down();await page.mouse.move(b.x+b.width*.7,b.y+b.height*.5);await page.mouse.up();
  await page.click('#freeze');await page.waitForFunction(()=>document.querySelector('#freeze-status').textContent.startsWith('Frozen snapshot')&&!document.querySelector('#freeze').disabled);
@@ -39,6 +41,8 @@ try{
  await page.fill('#rq-rank','4');await page.fill('#rq-p','4');await page.fill('#rq-count','4');
  const studyCount=(await get('/api/validation-studies')).studies.length;
  const preparation=await prepare();assert.equal(await page.locator('#rq-results').isVisible(),false);
+ assert.equal(await page.locator('#nav-inspect').isDisabled(),true);
+ assert.equal(await page.locator('#inspect-nav-state').textContent(),'not ready');
  assert.equal((await get('/api/validation-studies')).studies.length,studyCount);
  assert.equal(Number(await page.inputValue('#rq-eta')),Number(preparation.eta_calibration.eta.toFixed(4)));
  await page.locator('[data-parameter="rq-eta"]').hover();await page.waitForSelector('#parameter-tooltip:not([hidden])');
@@ -47,6 +51,7 @@ try{
  await page.fill('#rq-alpha','0.05');
  const a=await finalize(preparation);assert.equal(a.reconstruction_id,preparation.reconstruction_id);assert.deepEqual(a.center,preparation.center);assert.equal(a.iteration,5);assert.equal(a.step.step_policy,'power_iteration_half_v1');assert.ok(a.step.power_relative_residual<=1e-8);
  await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'),{},{timeout:120000});
+ await page.waitForFunction(()=>document.querySelector('#nav-inspect').getAttribute('aria-current')==='step'&&document.querySelector('#inspect-nav-state').textContent==='completed');
  assert.equal(await page.locator('#coverage-image').isVisible(),true);assert.match(await page.locator('#coverage-title').textContent(),/, 3 trials\)/);
  const studies=(await get('/api/validation-studies')).studies;const entry=studies.find(s=>s.plan.template_id===a.analysis_id);assert.ok(entry);
  const study=await get('/api/validation-studies/'+entry.study_id+'?arrays=1');
@@ -78,6 +83,7 @@ try{
  assert.ok((await page.locator('#coverage-variance-plot .diagnostic-pixel').textContent()).includes((study.maps.corrected.empirical_variance[0]-a.variance[0]).toPrecision(4)));
  await page.locator('#coverage-diagnostics > summary').click();
  console.log('PASS automatic coverage at captured K, matching settings, whole-image mean and original-observation plot');
+ await page.click('#nav-uq');
  // Restoring a reconstruction loads its study without submitting another run.
  await page.selectOption('#rq-analyses','');await page.selectOption('#rq-analyses',a.analysis_id);
  await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'));
@@ -94,9 +100,13 @@ try{
  await page.route('**/api/validation-studies',route=>route.request().method()==='POST'?route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:{message:'Test work limit exceeded'}})}):route.continue());
  await page.selectOption('#rq-mode','fixed');const failed=await reconstruct();
  await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('Test work limit exceeded'));
+ assert.equal(await page.locator('#inspect-nav-state').textContent(),'ready');
+ assert.equal(await page.locator('#nav-uq').getAttribute('aria-current'),'step');
+ await page.click('#nav-inspect');
  assert.equal(await page.locator('#rq-main-image').isVisible(),true);assert.equal(await page.locator('#rq-row-plot').evaluate(el=>el.data.some(t=>t.fill==='tonexty')),true);
- await page.unroute('**/api/validation-studies');
+ await page.unroute('**/api/validation-studies');await page.click('#nav-uq');
  await page.selectOption('#rq-analyses',a.analysis_id);await page.waitForFunction(()=>document.querySelector('#coverage-status').textContent.includes('completed · 3/3'));
+ await page.click('#nav-inspect');
  await page.setViewportSize({width:540,height:900});await page.waitForTimeout(500);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  assert.deepEqual(errors,[]);console.log('PASS saved coverage, staged preparation and invalidation, no crossing, validation failure, mobile layout and no browser errors');

@@ -47,8 +47,14 @@ export function rowPlot(plot,truth,trial,n,row,alpha=.05){
   if(!trial){globalThis.Plotly.purge(plot);plot.replaceChildren();return;}
   const {data,layout}=rowFigure(truth,trial,n,row,alpha);
   layout.width=plot.clientWidth||800;layout.height=plot.clientHeight||300;
+  const mobile=globalThis.matchMedia?.('(max-width:768px)').matches;
+  if(mobile){
+    layout.margin={l:46,r:8,t:12,b:130};
+    layout.legend={...layout.legend,x:0,y:-.25,xanchor:'left',yanchor:'top',orientation:'h',font:{size:12}};
+    layout.dragmode=false;
+  }
   // The mean is T_K y for this observation, not a repeated-trial average.
   return globalThis.Plotly.react(plot,data,layout,{responsive:true,displaylogo:false,
-    scrollZoom:false,displayModeBar:'hover',modeBarButtonsToRemove:['select2d','lasso2d'],
+    scrollZoom:false,displayModeBar:mobile?false:'hover',modeBarButtonsToRemove:['select2d','lasso2d'],
     toImageButtonOptions:{format:'png',filename:`confidence-interval-row-${row}`,scale:2}});
 }

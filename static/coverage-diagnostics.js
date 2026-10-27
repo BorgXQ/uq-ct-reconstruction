@@ -31,8 +31,9 @@ export function renderCoverageDiagnostics(study,analysis){
     const scale=document.createElement('div');scale.className='diagnostic-scale';
     scale.textContent=`${fmt(-extent)} ← 0 → ${fmt(extent)} ${unit}`;
     const legend=document.createElement('div');legend.className='diagnostic-gradient';
-    const info=document.createElement('p');info.className='diagnostic-pixel';info.textContent='Hover over a pixel for its values.';
+    const info=document.createElement('p');info.className='diagnostic-pixel';info.textContent=globalThis.matchMedia?.('(max-width:768px)').matches?'Tap a pixel for its values.':'Hover over a pixel for its values.';
     canvas.onmousemove=e=>{const box=canvas.getBoundingClientRect(),r=Math.min(n-1,Math.max(0,Math.floor((e.clientY-box.top)*n/box.height))),c=Math.min(n-1,Math.max(0,Math.floor((e.clientX-box.left)*n/box.width))),i=r*n+c,d=details[i];info.textContent=`Row ${r}, column ${c}: map ${fmt(values[i])}. Mean − truth ${d[0]}; noiseless bias ${d[1]}; empirical variance ${d[2]}; modeled variance ${d[3]}; ratio ${d[4]}; coverage ${d[5]}; SE of mean ${d[6]}.`;};
+    canvas.onpointerup=e=>{if(e.pointerType==='touch'||e.pointerType==='pen')canvas.onmousemove(e);};
     el.append(canvas,legend,scale,info);
   }
   const paint=()=>{draw('coverage-bias-plot',bias,'Density');draw('coverage-variance-plot',difference,'Density²');};

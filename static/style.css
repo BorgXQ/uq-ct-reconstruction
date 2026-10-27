@@ -181,3 +181,87 @@ select{height:var(--select-height);font-size:14px;line-height:20px;padding:8px 1
 .snapshot-controls .grow select{grid-row:2;width:100%}
 .snapshot-controls > button{grid-column:2;grid-row:2}
 .snapshot-controls .check{grid-column:2;grid-row:1;min-height:0;justify-self:end;margin:0}
+
+/* Phone/tablet presentation only; desktop rules above remain unchanged. */
+@media(max-width:768px){
+  :root{--select-height:48px;--select-action-width:112px;--select-gap:12px}
+  body{font-size:16px;line-height:1.55}
+  header{padding-top:24px;padding-bottom:18px}
+  header,nav,main{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  main{padding-bottom:max(64px,env(safe-area-inset-bottom))}
+  h1{font-size:28px;line-height:1.2;letter-spacing:-.6px;margin-bottom:0}
+  h2{font-size:21px;line-height:1.3}
+  h3{line-height:1.4}
+  .eyebrow{letter-spacing:1px;overflow-wrap:anywhere}
+  nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-bottom:20px}
+  nav button{min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:12px;min-height:76px}
+  nav button > span{white-space:normal;font-size:15px}
+  nav small{font-size:12px}
+  .panel{padding:16px;min-width:0}
+  .panel-title{gap:12px;align-items:flex-start}
+  .panel-title > div{min-width:0}
+  .tag{font-size:11px;padding:5px 6px}
+  p,.hint,.diagnostic-pixel,.sinogram-axes,.job-row{overflow-wrap:anywhere}
+  .hint,.settings label,.calibration-check{font-size:14px;line-height:1.5}
+  button,input,select{font-size:16px}
+  button,select,input[type=number]{min-height:48px}
+  button{padding:10px 12px;touch-action:manipulation}
+  select{height:48px;font-size:16px;max-width:100%}
+  input[type=number]{max-width:100%;font-size:16px}
+  .parameter-help{width:44px;height:44px;min-width:44px;min-height:44px;font-size:16px;padding:0}
+  .settings{gap:16px;margin:16px 0}
+  .settings label{min-width:0}
+  .settings:not(.snapshot-controls) > .grow{flex-basis:100%;min-width:0;display:grid;grid-template-columns:1fr auto}
+  .settings:not(.snapshot-controls) > .grow select{grid-column:1 / -1}
+  .example-loader button,.snapshot-controls > button{height:48px;font-size:16px}
+  .snapshot-controls .grow{grid-template-columns:minmax(0,1fr) auto}
+  .snapshot-controls .check{min-height:44px;gap:8px}
+  input[type=checkbox]{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+  .calibration-check{min-height:48px;gap:10px;white-space:normal}
+  #draw-workspace .draw-grid{grid-template-columns:1fr;grid-auto-rows:auto;gap:20px}
+  #draw-workspace .draw-grid > .panel{height:auto;grid-template-rows:auto auto auto auto;row-gap:20px}
+  #draw-workspace .draw-card-controls{row-gap:16px}
+  #paint-controls{row-gap:16px}
+  #paint-controls .palette{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
+  #paint-controls .palette button{width:100%;min-width:0;min-height:48px;padding:6px;font-size:13px}
+  #shade-value{font-size:13px}
+  .tools{gap:8px;flex-wrap:nowrap}
+  .tools button{min-width:0;padding:10px 6px;font-size:15px}
+  #draw-workspace .actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .tabs button{min-width:0;padding:10px 6px;font-size:15px}
+  .numerical-controls{display:grid;grid-template-columns:1fr;gap:12px}
+  .numerical-controls label{display:grid;grid-template-columns:1fr auto}
+  .numerical-controls select{grid-column:1 / -1;width:100%}
+  .numerical-controls .primary{width:100%}
+  #acquisition-form .scan-parameters,#rq-form .settings:not(.snapshot-controls),#rq-form .rq-settings-box:last-of-type .settings,#rq-final-form .settings{grid-template-columns:1fr;gap:20px}
+  #rq-form .settings > label,#rq-final-form .settings > label{min-width:0;flex-basis:auto;font-size:14px}
+  .rq-settings-box{padding:14px;margin:20px 0}
+  .rq-settings-box > h4{line-height:1.4}
+  #generate-scan,#rq-submit,#rq-finalize,#rq-source-retry{width:100%;white-space:normal}
+  .scan-grid,.rq-primary-grid,.coverage-diagnostic-grid{grid-template-columns:1fr;gap:24px}
+  .rq-primary-grid > .reconstruction-plot-card{display:block;grid-row:auto}
+  .reconstruction-plot-card > h3{margin-bottom:12px}
+  .sinogram{height:260px}
+  .image-with-scale{gap:10px}
+  #rq-main-image,#coverage-image{width:calc(100% - 54px)}
+  .density-scale{font-size:11px}
+  .rq-interval-panel{margin-top:28px}
+  #rq-row-plot{height:480px!important;touch-action:pan-y}
+  #inspect-workspace .rq-interval-panel .settings label{width:100%;display:grid;grid-template-columns:1fr auto}
+  #rq-main-row{grid-column:1 / -1;width:100%}
+  details > summary{min-height:48px;padding:12px 0;font-size:15px;line-height:1.5}
+  .job-row{align-items:stretch;gap:12px;padding:14px 0}
+  .job-row span{min-width:0;flex-basis:100%;font-size:13px}
+  .job-row button{min-width:100px}
+  .parameter-tooltip{font-size:14px;line-height:1.5;max-width:calc(100vw - 24px)}
+  pre{font-size:12px}
+}
+@media(max-width:480px){
+  .example-loader{grid-template-columns:minmax(0,1fr) 76px}
+  .example-loader button{width:76px}
+  .settings.snapshot-controls{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto 48px 48px;gap:10px}
+  .snapshot-controls .grow{grid-column:1 / -1;grid-row:1 / span 2}
+  .snapshot-controls > button{grid-column:1;grid-row:3;width:100%}
+  .snapshot-controls .check{grid-column:2;grid-row:3}
+  .panel-title{flex-wrap:wrap}
+}

@@ -13,9 +13,10 @@
     <section id="rq-source-options" class="rq-settings-box"><h4>Source assumption</h4>
       <div class="settings" id="rq-source-fields">
         <label>Exponent (ν)<input id="rq-nu" type="number" min="0" step="any" value="0.5" required></label>
-        <label>M calibrated from drawing<input id="rq-M" type="number" min="0" step="any" readonly aria-describedby="rq-source-status"></label>
+        <label>Manual source bound (M, optional)<input id="rq-M" type="number" min="0" step="any" placeholder="Use calibrated M" aria-describedby="rq-source-status"></label>
+        <label>Calibrated M<input id="rq-calibrated-M" type="number" readonly placeholder="Not available" aria-describedby="rq-source-status"></label>
       </div>
-    <p id="rq-source-status" role="status">Select an acquisition to check the source condition.</p><button id="rq-source-retry" type="button">Recheck source condition</button>
+    <p id="rq-source-status" role="status">Select an acquisition to check the source condition.</p><button id="rq-source-retry" type="button">Calculate M from drawing</button>
     </section>
     <section id="rq-approx-options" class="rq-settings-box"><h4>Approximation settings</h4><div class="settings">
       <label>Retained rank (r)<input id="rq-rank" type="number" min="1" value="128" required></label>

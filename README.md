@@ -4,7 +4,7 @@ An interactive app for drawing an image, simulating a CT scan, and reconstructin
 
 Read the [project blog post](https://jonathanwidarsa.com/blog/uncertainty-quantification-for-ct-reconstruction/) for the mathematics, experiments, and limitations.
 
-![Landweber reconstruction and empirical coverage across 100 trials](assets/reconstruction-and-empirical-coverage.png)
+![Landweber reconstruction and empirical coverage across 100 trials](assets/results.png)
 
 ## Features
 

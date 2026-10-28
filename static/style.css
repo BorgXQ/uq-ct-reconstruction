@@ -265,3 +265,9 @@ select{height:var(--select-height);font-size:14px;line-height:20px;padding:8px 1
   .snapshot-controls .check{grid-column:2;grid-row:3}
   .panel-title{flex-wrap:wrap}
 }
+
+/* Repository attribution stays alongside the project label. */
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.header-top .eyebrow{min-width:0}
+.github-link{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;min-height:44px;padding:0 8px;color:var(--accent);font:12px/1.5 ui-monospace,monospace;text-decoration:none;border-radius:5px}
+.github-link:hover{background:#e6eee5;text-decoration:underline;text-underline-offset:3px}

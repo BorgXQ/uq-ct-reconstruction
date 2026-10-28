@@ -20,7 +20,7 @@ const help={
   'rq-M':'Optional nonnegative source bound in x = (AᵀA)^ν w, ‖w‖ ≤ M. A filled value always overrides calibration. Leave blank to use a compatible calibrated M. A manual value is an assumption, not proof of compatibility.',
   'rq-calibrated-M':'Numerically calibrated source bound for this observation and exponent ν. Used only when manual M is empty. Calibration does not establish the retained- or omitted-bias assumptions.',
   'rq-alpha':'Gaussian tail probability. α = 0.05 gives a nominal 95% interval; α = 0.01 gives 99%. Smaller α widens the Gaussian allowance. Coverage still depends on the stated assumptions.',
-  'rq-rank':'Number r of retained normal-operator directions for uncertainty approximation. Defaults: 32 at 16², 64 at 32², 128 at 64². Landweber still uses the full operator.',
+  'rq-rank':'Number r of retained normal-operator directions for uncertainty approximation. Defaults: 32 at 16², 64 at 32², 128 at 64², 256 at 128². Landweber still uses the full operator.',
   'rq-p':'Additional random sketch directions beyond r. The sketch width is r + p; more oversampling can improve the approximation but costs work.',
   'rq-count':'Number N of Rademacher probes used to estimate the omitted covariance diagonal. More probes can reduce estimation noise; these are not repeated measurement trials.',
   'rq-eta':'Calculated after K is selected: actual omitted-bias norm / actual retained-bias norm. Uses the frozen drawing; the retained-bias bound must still be checked.',
